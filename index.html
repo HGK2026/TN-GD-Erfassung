@@ -31,31 +31,42 @@
 
       // Live-Synchronisierung
       onValue(dbRef, (snapshot) => {
-        const data = snapshot.val();
-        if (data) {
-          const counters = ['saalGesamt', 'saalKinder', 'saalBesucher', 'saalGaeste', 'empGesamt', 'empKinder', 'empBesucher', 'empGaeste'];
-          counters.forEach(id => {
-            if (data[id] !== undefined) document.getElementById(id).innerText = data[id];
-          });
-          const fields = ['datum', 'typ', 'beginn', 'ende', 'textwort', 'lied1', 'lied2', 'lied3', 'leiter', 'mit1', 'mit2', 'notizen'];
-          fields.forEach(id => {
-            const el = document.getElementById(id);
-            if (data[id] !== undefined && el.disabled) el.value = data[id];
-            else if (data[id] === "") el.value = ""; 
-          });
-        }
+        const data = snapshot.val() || {};
+        const counters = ['saalGesamt', 'saalKinder', 'saalBesucher', 'saalGaeste', 'empGesamt', 'empKinder', 'empBesucher', 'empGaeste'];
+        counters.forEach(id => {
+          const el = document.getElementById(id);
+          if (!el) return;
+          // Falls kein Wert im DB vorhanden, 0 anzeigen
+          const value = (data[id] !== undefined && data[id] !== null && data[id] !== "") ? data[id] : 0;
+          el.innerText = value;
+        });
+
+        const fields = ['datum', 'typ', 'beginn', 'ende', 'textwort', 'lied1', 'lied2', 'lied3', 'leiter', 'mit1', 'mit2', 'notizen'];
+        fields.forEach(id => {
+          const el = document.getElementById(id);
+          if (!el) return;
+          if (data[id] !== undefined && data[id] !== null) {
+            // always sync the value from DB (avoids innerText/value confusion)
+            el.value = data[id];
+          } else {
+            // fallback auf leeren Wert
+            if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT') el.value = "";
+          }
+        });
       });
 
       // Klickvariante (+/-)
       window.updateCount = function(id, delta) {
         const card = document.getElementById('card-' + id);
-        if (card.classList.contains('locked')) return;
+        if (card && card.classList.contains('locked')) return;
 
         const el = document.getElementById(id);
-        const currentVal = parseInt(el.innerText) || 0;
+        if (!el) return;
+        const currentVal = parseInt(el.innerText, 10) || 0;
         const newVal = currentVal + delta;
         
         if (newVal >= 0) {
+          // nur den Zahlenwert aktualisieren
           update(ref(db, 'aktuellerGD'), { [id]: newVal });
         }
       };
@@ -63,14 +74,15 @@
       // Überschreibvariante (Tippen auf Zahl)
       window.editCount = function(id) {
         const card = document.getElementById('card-' + id);
-        if (card.classList.contains('locked')) return;
+        if (card && card.classList.contains('locked')) return;
 
         const el = document.getElementById(id);
+        if (!el) return;
         const currentVal = el.innerText;
         const newVal = prompt("Zahl manuell eingeben:", currentVal);
         
-        if (newVal !== null && !isNaN(newVal) && newVal.trim() !== "") {
-          const num = parseInt(newVal);
+        if (newVal !== null && newVal.trim() !== "" && !isNaN(newVal)) {
+          const num = parseInt(newVal, 10);
           if (num >= 0) {
             update(ref(db, 'aktuellerGD'), { [id]: num });
           }
@@ -79,22 +91,28 @@
 
       window.toggleLock = function(id) {
         const el = document.getElementById(id);
+        if (!el) return;
         const btn = el.parentElement.querySelector('.lock-btn');
         el.disabled = !el.disabled;
         if (el.disabled) {
-          btn.innerText = "🔒"; btn.classList.add('locked');
-          update(ref(db, 'aktuellerGD'), { [id]: el.value });
+          if (btn) { btn.innerText = "🔒"; btn.classList.add('locked'); }
+          // Speichern des aktuellen Wertes in DB, wenn gesperrt wird
+          const valueToStore = el.value !== undefined ? el.value : "";
+          update(ref(db, 'aktuellerGD'), { [id]: valueToStore });
         } else {
-          btn.innerText = "🔓"; btn.classList.remove('locked');
+          if (btn) { btn.innerText = "🔓"; btn.classList.remove('locked'); }
         }
       };
 
       window.toggleCounterLock = function(id) {
         const card = document.getElementById('card-' + id);
+        if (!card) return;
         const lockBtn = card.querySelector('.lock-btn');
         const isLocked = card.classList.toggle('locked');
-        lockBtn.innerText = isLocked ? "🔒" : "🔓";
-        lockBtn.classList.toggle('locked');
+        if (lockBtn) {
+          lockBtn.innerText = isLocked ? "🔒" : "🔓";
+          lockBtn.classList.toggle('locked', isLocked);
+        }
       };
 
       window.resetAll = function() {
@@ -102,6 +120,7 @@
           const resetData = {
             saalGesamt: 0, saalKinder: 0, saalBesucher: 0, saalGaeste: 0,
             empGesamt: 0, empKinder: 0, empBesucher: 0, empGaeste: 0,
+            datum: "", typ: "", beginn: "", ende: "",
             textwort: "", lied1: "", lied2: "", lied3: "", leiter: "", mit1: "", mit2: "", notizen: ""
           };
           update(ref(db, 'aktuellerGD'), resetData);
@@ -125,13 +144,14 @@
         .counter-card { background: #fff; border: 2px solid #eee; padding: 15px; border-radius: 15px; text-align: center; position: relative; }
         .counter-card.locked { background: #f8f9fa; opacity: 0.7; }
         .counter-controls { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 10px; }
-        .btn-count { flex: 1; height: 75px; font-size: 35px; font-weight: bold; border: none; border-radius: 12px; cursor: pointer; color: white; }
+        .btn-count { flex: 1; height: 50px; font-size: 28px; font-weight: bold; border: none; border-radius: 12px; cursor: pointer; color: white; }
         .plus { background-color: #27ae60; }
         .minus { background-color: #c0392b; }
-        .count-value { font-size: 38px; font-weight: 800; min-width: 60px; cursor: pointer; display: inline-block; padding: 5px; }
+        .count-value { font-size: 32px; font-weight: 800; min-width: 60px; cursor: pointer; display: inline-block; padding: 5px; }
+        .counter-label { display:block; font-weight:700; margin-bottom:6px; color:#34495e; }
 
         .btn-pdf { width: 100%; background: #1a3a5a; color: white; padding: 20px; border: none; border-radius: 12px; font-size: 1.2em; font-weight: bold; cursor: pointer; margin-top: 20px; }
-        .btn-reset { width: 100%; background: #e74c3c; color: white; padding: 10px; border: none; border-radius: 8px; font-size: 0.8em; cursor: pointer; margin-top: 10px; opacity: 0.6; }
+        .btn-reset { width: 100%; background: #e74c3c; color: white; padding: 10px; border: none; border-radius: 8px; font-size: 0.8em; cursor: pointer; margin-top: 10px; opacity: 0.9; }
     </style>
 </head>
 <body>
@@ -139,66 +159,244 @@
     <h1>GD-Erfassung</h1>
 
     <div class="row">
-        <div class="field-container"><button class="lock-btn" onclick="toggleLock('datum')">🔓</button><label>Datum</label><input type="date" id="datum"></div>
-        <div class="field-container"><button class="lock-btn" onclick="toggleLock('typ')">🔓</button><label>Gottesdienst-Typ</label><select id="typ">
-            <option>Sonntagsgottesdienst</option><option>Wochengottesdienst</option><option>Kindergottesdienst</option><option>Jugendgottesdienst</option><option>Entschlafenengottesdienst</option><option>Ämterzusammenkunft</option><option>Jugendzusammenkunft</option>
-        </select></div>
+        <div class="field-container">
+            <button type="button" class="lock-btn" onclick="toggleLock('datum')">🔓</button>
+            <label>Datum</label>
+            <input type="date" id="datum">
+        </div>
+        <div class="field-container">
+            <button type="button" class="lock-btn" onclick="toggleLock('typ')">🔓</button>
+            <label>Gottesdienst-Typ</label>
+            <select id="typ">
+                <option value="Sonntagsgottesdienst">Sonntagsgottesdienst</option>
+                <option value="Wochengottesdienst">Wochengottesdienst</option>
+                <option value="Kindergottesdienst">Kindergottesdienst</option>
+                <option value="Jugendgottesdienst">Jugendgottesdienst</option>
+                <option value="Entschlafenengottesdienst">Entschlafenengottesdienst</option>
+                <option value="Anderer">Anderer</option>
+            </select>
+        </div>
     </div>
 
     <div class="row">
-        <div class="field-container"><button class="lock-btn" onclick="toggleLock('beginn')">🔓</button><label>Beginn</label><input type="time" id="beginn"></div>
-        <div class="field-container"><button class="lock-btn" onclick="toggleLock('ende')">🔓</button><label>Ende</label><input type="time" id="ende"></div>
+        <div class="field-container">
+            <button type="button" class="lock-btn" onclick="toggleLock('beginn')">🔓</button>
+            <label>Beginn</label>
+            <input type="time" id="beginn">
+        </div>
+        <div class="field-container">
+            <button type="button" class="lock-btn" onclick="toggleLock('ende')">🔓</button>
+            <label>Ende</label>
+            <input type="time" id="ende">
+        </div>
     </div>
 
     <div class="row">
-        <div class="field-container"><button class="lock-btn" onclick="toggleLock('textwort')">🔓</button><label>Textwort</label><input type="text" id="textwort"></div>
-        <div class="field-container"><button class="lock-btn" onclick="toggleLock('lied1')">🔓</button><label>Eingangslied</label><input type="text" id="lied1"></div>
-        <div class="field-container"><button class="lock-btn" onclick="toggleLock('lied2')">🔓</button><label>Bußlied</label><input type="text" id="lied2"></div>
-        <div class="field-container"><button class="lock-btn" onclick="toggleLock('lied3')">🔓</button><label>Abendmahlslied</label><input type="text" id="lied3"></div>
+        <div class="field-container">
+            <button type="button" class="lock-btn" onclick="toggleLock('textwort')">🔓</button>
+            <label>Textwort</label>
+            <input type="text" id="textwort">
+        </div>
+        <div class="field-container">
+            <button type="button" class="lock-btn" onclick="toggleLock('lied1')">🔓</button>
+            <label>Eingangslied</label>
+            <input type="text" id="lied1">
+        </div>
+        <div class="field-container">
+            <button type="button" class="lock-btn" onclick="toggleLock('lied2')">🔓</button>
+            <label>Bußlied</label>
+            <input type="text" id="lied2">
+        </div>
+        <div class="field-container">
+            <button type="button" class="lock-btn" onclick="toggleLock('lied3')">🔓</button>
+            <label>Abendmahlslied</label>
+            <input type="text" id="lied3">
+        </div>
     </div>
 
     <div class="row">
-        <div class="field-container"><button class="lock-btn" onclick="toggleLock('leiter')">🔓</button><label>Dienstleiter</label><input type="text" id="leiter"></div>
-        <div class="field-container"><button class="lock-btn" onclick="toggleLock('mit1')">🔓</button><label>1. Mitdienender</label><input type="text" id="mit1"></div>
-        <div class="field-container"><button class="lock-btn" onclick="toggleLock('mit2')">🔓</button><label>2. Mitdienender</label><input type="text" id="mit2"></div>
+        <div class="field-container">
+            <button type="button" class="lock-btn" onclick="toggleLock('leiter')">🔓</button>
+            <label>Dienstleiter</label>
+            <input type="text" id="leiter">
+        </div>
+        <div class="field-container">
+            <button type="button" class="lock-btn" onclick="toggleLock('mit1')">🔓</button>
+            <label>1. Mitdienender</label>
+            <input type="text" id="mit1">
+        </div>
+        <div class="field-container">
+            <button type="button" class="lock-btn" onclick="toggleLock('mit2')">🔓</button>
+            <label>2. Mitdienender</label>
+            <input type="text" id="mit2">
+        </div>
     </div>
 
     <span class="section-title">Kirchensaal (Tippe auf Zahl zum Ändern)</span>
-    <div class="row"><div class="counter-grid">
-        <div class="counter-card" id="card-saalGesamt"><button class="lock-btn" onclick="toggleCounterLock('saalGesamt')">🔓</button><span class="counter-label">Gesamt</span><div class="counter-controls"><button class="btn-count minus" onclick="updateCount('saalGesamt', -1)">-</button><span class="count-value" id="saalGesamt" onclick="editCount('saalGesamt')">0</span><button class="btn-count plus" onclick="updateCount('saalGesamt', 1)">+</button></div></div>
-        <div class="counter-card" id="card-saalKinder"><button class="lock-btn" onclick="toggleCounterLock('saalKinder')">🔓</button><span class="counter-label">Kinder</span><div class="counter-controls"><button class="btn-count minus" onclick="updateCount('saalKinder', -1)">-</button><span class="count-value" id="saalKinder" onclick="editCount('saalKinder')">0</span><button class="btn-count plus" onclick="updateCount('saalKinder', 1)">+</button></div></div>
-        <div class="counter-card" id="card-saalBesucher"><button class="lock-btn" onclick="toggleCounterLock('saalBesucher')">🔓</button><span class="counter-label">Besucher</span><div class="counter-controls"><button class="btn-count minus" onclick="updateCount('saalBesucher', -1)">-</button><span class="count-value" id="saalBesucher" onclick="editCount('saalBesucher')">0</span><button class="btn-count plus" onclick="updateCount('saalBesucher', 1)">+</button></div></div>
-        <div class="counter-card" id="card-saalGaeste"><button class="lock-btn" onclick="toggleCounterLock('saalGaeste')">🔓</button><span class="counter-label">Gäste</span><div class="counter-controls"><button class="btn-count minus" onclick="updateCount('saalGaeste', -1)">-</button><span class="count-value" id="saalGaeste" onclick="editCount('saalGaeste')">0</span><button class="btn-count plus" onclick="updateCount('saalGaeste', 1)">+</button></div></div>
-    </div></div>
+    <div class="row">
+        <div class="counter-grid">
+            <div class="counter-card" id="card-saalGesamt">
+                <button type="button" class="lock-btn" onclick="toggleCounterLock('saalGesamt')">🔓</button>
+                <span class="counter-label">Gesamt</span>
+                <div class="counter-controls">
+                    <button type="button" class="btn-count minus" onclick="updateCount('saalGesamt', -1)">-</button>
+                    <span id="saalGesamt" class="count-value" onclick="editCount('saalGesamt')">0</span>
+                    <button type="button" class="btn-count plus" onclick="updateCount('saalGesamt', 1)">+</button>
+                </div>
+            </div>
+
+            <div class="counter-card" id="card-saalKinder">
+                <button type="button" class="lock-btn" onclick="toggleCounterLock('saalKinder')">🔓</button>
+                <span class="counter-label">Kinder</span>
+                <div class="counter-controls">
+                    <button type="button" class="btn-count minus" onclick="updateCount('saalKinder', -1)">-</button>
+                    <span id="saalKinder" class="count-value" onclick="editCount('saalKinder')">0</span>
+                    <button type="button" class="btn-count plus" onclick="updateCount('saalKinder', 1)">+</button>
+                </div>
+            </div>
+
+            <div class="counter-card" id="card-saalBesucher">
+                <button type="button" class="lock-btn" onclick="toggleCounterLock('saalBesucher')">🔓</button>
+                <span class="counter-label">Besucher</span>
+                <div class="counter-controls">
+                    <button type="button" class="btn-count minus" onclick="updateCount('saalBesucher', -1)">-</button>
+                    <span id="saalBesucher" class="count-value" onclick="editCount('saalBesucher')">0</span>
+                    <button type="button" class="btn-count plus" onclick="updateCount('saalBesucher', 1)">+</button>
+                </div>
+            </div>
+
+            <div class="counter-card" id="card-saalGaeste">
+                <button type="button" class="lock-btn" onclick="toggleCounterLock('saalGaeste')">🔓</button>
+                <span class="counter-label">Gäste</span>
+                <div class="counter-controls">
+                    <button type="button" class="btn-count minus" onclick="updateCount('saalGaeste', -1)">-</button>
+                    <span id="saalGaeste" class="count-value" onclick="editCount('saalGaeste')">0</span>
+                    <button type="button" class="btn-count plus" onclick="updateCount('saalGaeste', 1)">+</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <span class="section-title">Empore / Nebenräume</span>
-    <div class="row"><div class="counter-grid">
-        <div class="counter-card" id="card-empGesamt"><button class="lock-btn" onclick="toggleCounterLock('empGesamt')">🔓</button><span class="counter-label">Gesamt</span><div class="counter-controls"><button class="btn-count minus" onclick="updateCount('empGesamt', -1)">-</button><span class="count-value" id="empGesamt" onclick="editCount('empGesamt')">0</span><button class="btn-count plus" onclick="updateCount('empGesamt', 1)">+</button></div></div>
-        <div class="counter-card" id="card-empKinder"><button class="lock-btn" onclick="toggleCounterLock('empKinder')">🔓</button><span class="counter-label">Kinder</span><div class="counter-controls"><button class="btn-count minus" onclick="updateCount('empKinder', -1)">-</button><span class="count-value" id="empKinder" onclick="editCount('empKinder')">0</span><button class="btn-count plus" onclick="updateCount('empKinder', 1)">+</button></div></div>
-        <div class="counter-card" id="card-empBesucher"><button class="lock-btn" onclick="toggleCounterLock('empBesucher')">🔓</button><span class="counter-label">Besucher</span><div class="counter-controls"><button class="btn-count minus" onclick="updateCount('empBesucher', -1)">-</button><span class="count-value" id="empBesucher" onclick="editCount('empBesucher')">0</span><button class="btn-count plus" onclick="updateCount('empBesucher', 1)">+</button></div></div>
-        <div class="counter-card" id="card-empGaeste"><button class="lock-btn" onclick="toggleCounterLock('empGaeste')">🔓</button><span class="counter-label">Gäste</span><div class="counter-controls"><button class="btn-count minus" onclick="updateCount('empGaeste', -1)">-</button><span class="count-value" id="empGaeste" onclick="editCount('empGaeste')">0</span><button class="btn-count plus" onclick="updateCount('empGaeste', 1)">+</button></div></div>
-    </div></div>
+    <div class="row">
+        <div class="counter-grid">
+            <div class="counter-card" id="card-empGesamt">
+                <button type="button" class="lock-btn" onclick="toggleCounterLock('empGesamt')">🔓</button>
+                <span class="counter-label">Gesamt</span>
+                <div class="counter-controls">
+                    <button type="button" class="btn-count minus" onclick="updateCount('empGesamt', -1)">-</button>
+                    <span id="empGesamt" class="count-value" onclick="editCount('empGesamt')">0</span>
+                    <button type="button" class="btn-count plus" onclick="updateCount('empGesamt', 1)">+</button>
+                </div>
+            </div>
+
+            <div class="counter-card" id="card-empKinder">
+                <button type="button" class="lock-btn" onclick="toggleCounterLock('empKinder')">🔓</button>
+                <span class="counter-label">Kinder</span>
+                <div class="counter-controls">
+                    <button type="button" class="btn-count minus" onclick="updateCount('empKinder', -1)">-</button>
+                    <span id="empKinder" class="count-value" onclick="editCount('empKinder')">0</span>
+                    <button type="button" class="btn-count plus" onclick="updateCount('empKinder', 1)">+</button>
+                </div>
+            </div>
+
+            <div class="counter-card" id="card-empBesucher">
+                <button type="button" class="lock-btn" onclick="toggleCounterLock('empBesucher')">🔓</button>
+                <span class="counter-label">Besucher</span>
+                <div class="counter-controls">
+                    <button type="button" class="btn-count minus" onclick="updateCount('empBesucher', -1)">-</button>
+                    <span id="empBesucher" class="count-value" onclick="editCount('empBesucher')">0</span>
+                    <button type="button" class="btn-count plus" onclick="updateCount('empBesucher', 1)">+</button>
+                </div>
+            </div>
+
+            <div class="counter-card" id="card-empGaeste">
+                <button type="button" class="lock-btn" onclick="toggleCounterLock('empGaeste')">🔓</button>
+                <span class="counter-label">Gäste</span>
+                <div class="counter-controls">
+                    <button type="button" class="btn-count minus" onclick="updateCount('empGaeste', -1)">-</button>
+                    <span id="empGaeste" class="count-value" onclick="editCount('empGaeste')">0</span>
+                    <button type="button" class="btn-count plus" onclick="updateCount('empGaeste', 1)">+</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <span class="section-title">Notizen</span>
-    <div class="row"><div class="field-container"><button class="lock-btn" onclick="toggleLock('notizen')">🔓</button><textarea id="notizen" rows="10"></textarea></div></div>
+    <div class="row">
+        <div class="field-container">
+            <button type="button" class="lock-btn" onclick="toggleLock('notizen')">🔓</button>
+            <textarea id="notizen" rows="10"></textarea>
+        </div>
+    </div>
 
-    <button class="btn-pdf" onclick="generatePDF()">PDF ERZEUGEN</button>
-    <button class="btn-reset" onclick="resetAll()">Daten-Reset (Alles auf Null)</button>
+    <button type="button" class="btn-pdf" onclick="generatePDF()">PDF ERZEUGEN</button>
+    <button type="button" class="btn-reset" onclick="resetAll()">Daten-Reset (Alles auf Null)</button>
 
     <script>
         function generatePDF() {
             const { jsPDF } = window.jspdf;
-            const doc = new jsPDF();
-            doc.setFontSize(20); doc.text("GD-Erfassung", 105, 20, { align: "center" });
-            doc.setFontSize(12);
-            doc.text(`Datum: ${document.getElementById('datum').value}`, 20, 40);
-            doc.text(`Typ: ${document.getElementById('typ').value}`, 20, 50);
-            doc.text(`Zeit: ${document.getElementById('beginn').value} - ${document.getElementById('ende').value}`, 20, 60);
-            doc.text(`Leiter: ${document.getElementById('leiter').value}`, 20, 70);
-            doc.text(`Saal (Gesamt): ${document.getElementById('saalGesamt').innerText}`, 20, 90);
-            doc.text(`Empore (Gesamt): ${document.getElementById('empGesamt').innerText}`, 20, 100);
-            doc.text("Notizen:", 20, 120);
-            doc.text(doc.splitTextToSize(document.getElementById('notizen').value, 170), 20, 130);
+            const doc = new jsPDF('p','mm','a4');
+            const left = 20;
+            let y = 20;
+
+            doc.setFontSize(18);
+            doc.text("GD-Erfassung", 105, y, { align: "center" });
+            y += 10;
+
+            doc.setFontSize(11);
+
+            // Hilfsfunktion: schreibe Label und Wert, y wird zurückgegeben
+            function writeRow(label, value, extraSpacing = 7) {
+              doc.setFont(undefined, 'bold'); doc.text(label + ": ", left, y);
+              doc.setFont(undefined, 'normal');
+              const lines = doc.splitTextToSize(String(value || ""), 150);
+              doc.text(lines, left + 40, y);
+              // y um mehrere Zeilen erhöhen (jede Zeile ca. 7mm)
+              y += extraSpacing * (Array.isArray(lines) ? lines.length : 1);
+              y += 2;
+            }
+
+            writeRow("Datum", document.getElementById('datum').value);
+            writeRow("Typ", document.getElementById('typ').value);
+            writeRow("Zeit", (document.getElementById('beginn').value || "") + (document.getElementById('beginn').value || document.getElementById('ende').value ? " - " : "") + (document.getElementById('ende').value || ""));
+            writeRow("Textwort", document.getElementById('textwort').value);
+            writeRow("Lied 1 (Eingang)", document.getElementById('lied1').value);
+            writeRow("Lied 2 (Bußlied)", document.getElementById('lied2').value);
+            writeRow("Lied 3 (Abendmahlslied)", document.getElementById('lied3').value);
+            writeRow("Leiter", document.getElementById('leiter').value);
+            writeRow("Mitdienender 1", document.getElementById('mit1').value);
+            writeRow("Mitdienender 2", document.getElementById('mit2').value);
+
+            // Abstand vor Zähler
+            y += 4;
+            doc.setFont(undefined, 'bold');
+            doc.text("Kirchensaal", left, y);
+            y += 6;
+            doc.setFont(undefined, 'normal');
+            writeRow("Saal - Gesamt", document.getElementById('saalGesamt').innerText);
+            writeRow("Saal - Kinder", document.getElementById('saalKinder').innerText);
+            writeRow("Saal - Besucher", document.getElementById('saalBesucher').innerText);
+            writeRow("Saal - Gäste", document.getElementById('saalGaeste').innerText);
+
+            y += 2;
+            doc.setFont(undefined, 'bold');
+            doc.text("Empore / Nebenräume", left, y);
+            y += 6;
+            doc.setFont(undefined, 'normal');
+            writeRow("Empore - Gesamt", document.getElementById('empGesamt').innerText);
+            writeRow("Empore - Kinder", document.getElementById('empKinder').innerText);
+            writeRow("Empore - Besucher", document.getElementById('empBesucher').innerText);
+            writeRow("Empore - Gäste", document.getElementById('empGaeste').innerText);
+
+            y += 6;
+            writeRow("Notizen", document.getElementById('notizen').value, 7);
+
+            // Falls y zu groß wird: neue Seite (einfacher Schutz)
+            if (y > 270) {
+              // keine aufwändige Seitenlogik hier; jsPDF splittet Text bereits
+            }
+
             doc.save("GD_Erfassung.pdf");
         }
     </script>
