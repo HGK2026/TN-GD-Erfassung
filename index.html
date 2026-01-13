@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GD-Erfassung</title>
+    
+    <link rel="manifest" href="manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    
+    <script type="module">
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-app.js";
+      import { getDatabase, ref, set, onValue, update } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-database.js";
+
+      const firebaseConfig = {
+        apiKey: "AIzaSyBSduIxEC1XtD37ppTgSaQtHImkXG1ofi4",
+        authDomain: "gd-erfassung.firebaseapp.com",
+        projectId: "gd-erfassung",
+        databaseURL: "https://gd-erfassung-default-rtdb.europe-west1.firebasedatabase.app",
+        storageBucket: "gd-erfassung.firebasestorage.app",
+        messagingSenderId: "451038031834",
+        appId: "1:451038031834:web:a420355561350904a99ae3",
+        measurementId: "G-CXB7W3WE7J"
+      };
+
+      const app = initializeApp(firebaseConfig);
+      const db = getDatabase(app);
+      const dbRef = ref(db, 'aktuellerGD');
+
+      // Live-Synchronisierung
+      onValue(dbRef, (snapshot) => {
+        const data = snapshot.val();
+        if (data) {
+          const counters = ['saalGesamt', 'saalKinder', 'saalBesucher', 'saalGaeste', 'empGesamt', 'empKinder', 'empBesucher', 'empGaeste'];
+          counters.forEach(id => {
+            if (data[id] !== undefined) document.getElementById(id).innerText = data[id];
+          });
+          const fields = ['datum', 'typ', 'beginn', 'ende', 'textwort', 'lied1', 'lied2', 'lied3', 'leiter', 'mit1', 'mit2', 'notizen'];
+          fields.forEach(id => {
+            const el = document.getElementById(id);
+            if (data[id] !== undefined && el.disabled) el.value = data[id];
+            else if (data[id] === "") el.value = ""; 
+          });
+        }
+      });
+
+      // Klickvariante (+/-)
+      window.updateCount = function(id, delta) {
+        const card = document.getElementById('card-' + id);
+        if (card.classList.contains('locked')) return;
+
+        const el = document.getElementById(id);
+        const currentVal = parseInt(el.innerText) || 0;
+        const newVal = currentVal + delta;
+        
+        if (newVal >= 0) {
+          update(ref(db, 'aktuellerGD'), { [id]: newVal });
+        }
+      };
+
+      // Überschreibvariante (Tippen auf Zahl)
+      window.editCount = function(id) {
+        const card = document.getElementById('card-' + id);
+        if (card.classList.contains('locked')) return;
+
+        const el = document.getElementById(id);
+        const currentVal = el.innerText;
+        const newVal = prompt("Zahl manuell eingeben:", currentVal);
+        
+        if (newVal !== null && !isNaN(newVal) && newVal.trim() !== "") {
+          const num = parseInt(newVal);
+          if (num >= 0) {
+            update(ref(db, 'aktuellerGD'), { [id]: num });
+          }
+        }
+      };
+
+      window.toggleLock = function(id) {
+        const el = document.getElementById(id);
+        const btn = el.parentElement.querySelector('.lock-btn');
+        el.disabled = !el.disabled;
+        if (el.disabled) {
+          btn.innerText = "🔒"; btn.classList.add('locked');
+          update(ref(db, 'aktuellerGD'), { [id]: el.value });
+        } else {
+          btn.innerText = "🔓"; btn.classList.remove('locked');
+        }
+      };
+
+      window.toggleCounterLock = function(id) {
+        const card = document.getElementById('card-' + id);
+        const lockBtn = card.querySelector('.lock-btn');
+        const isLocked = card.classList.toggle('locked');
+        lockBtn.innerText = isLocked ? "🔒" : "🔓";
+        lockBtn.classList.toggle('locked');
+      };
+
+      window.resetAll = function() {
+        if (confirm("Wirklich alles auf Null setzen?")) {
+          const resetData = {
+            saalGesamt: 0, saalKinder: 0, saalBesucher: 0, saalGaeste: 0,
+            empGesamt: 0, empKinder: 0, empBesucher: 0, empGaeste: 0,
+            textwort: "", lied1: "", lied2: "", lied3: "", leiter: "", mit1: "", mit2: "", notizen: ""
+          };
+          update(ref(db, 'aktuellerGD'), resetData);
+        }
+      };
+    </script>
+
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; max-width: 900px; margin: 10px auto; padding: 15px; background-color: #f0f2f5; color: #333; }
+        h1 { text-align: center; color: #1a3a5a; text-transform: uppercase; border-bottom: 3px solid #1a3a5a; padding-bottom: 10px; }
+        .section-title { font-weight: bold; font-size: 1.1em; margin: 20px 0 10px 0; color: #1a3a5a; display: block; background: #d1d8e0; padding: 8px 12px; border-radius: 6px; }
+        .row { display: flex; flex-wrap: wrap; gap: 15px; margin-bottom: 15px; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        .field-container { flex: 1; min-width: 220px; display: flex; flex-direction: column; position: relative; }
+        .lock-btn { position: absolute; right: 0; top: 0; background: none; border: none; cursor: pointer; font-size: 20px; color: #bdc3c7; z-index: 5; }
+        .lock-btn.locked { color: #e74c3c; }
+        label { font-weight: 600; font-size: 0.85em; margin-bottom: 8px; color: #555; }
+        input, select, textarea { padding: 12px; border: 2px solid #eee; border-radius: 8px; font-size: 16px; }
+        input:disabled, textarea:disabled { background: #f8f9fa; color: #7f8c8d; }
+        
+        .counter-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; width: 100%; }
+        .counter-card { background: #fff; border: 2px solid #eee; padding: 15px; border-radius: 15px; text-align: center; position: relative; }
+        .counter-card.locked { background: #f8f9fa; opacity: 0.7; }
+        .counter-controls { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 10px; }
+        .btn-count { flex: 1; height: 75px; font-size: 35px; font-weight: bold; border: none; border-radius: 12px; cursor: pointer; color: white; }
+        .plus { background-color: #27ae60; }
+        .minus { background-color: #c0392b; }
+        .count-value { font-size: 38px; font-weight: 800; min-width: 60px; cursor: pointer; display: inline-block; padding: 5px; }
+
+        .btn-pdf { width: 100%; background: #1a3a5a; color: white; padding: 20px; border: none; border-radius: 12px; font-size: 1.2em; font-weight: bold; cursor: pointer; margin-top: 20px; }
+        .btn-reset { width: 100%; background: #e74c3c; color: white; padding: 10px; border: none; border-radius: 8px; font-size: 0.8em; cursor: pointer; margin-top: 10px; opacity: 0.6; }
+    </style>
+</head>
+<body>
+
+    <h1>GD-Erfassung</h1>
+
+    <div class="row">
+        <div class="field-container"><button class="lock-btn" onclick="toggleLock('datum')">🔓</button><label>Datum</label><input type="date" id="datum"></div>
+        <div class="field-container"><button class="lock-btn" onclick="toggleLock('typ')">🔓</button><label>Gottesdienst-Typ</label><select id="typ">
+            <option>Sonntagsgottesdienst</option><option>Wochengottesdienst</option><option>Kindergottesdienst</option><option>Jugendgottesdienst</option><option>Entschlafenengottesdienst</option><option>Ämterzusammenkunft</option><option>Jugendzusammenkunft</option>
+        </select></div>
+    </div>
+
+    <div class="row">
+        <div class="field-container"><button class="lock-btn" onclick="toggleLock('beginn')">🔓</button><label>Beginn</label><input type="time" id="beginn"></div>
+        <div class="field-container"><button class="lock-btn" onclick="toggleLock('ende')">🔓</button><label>Ende</label><input type="time" id="ende"></div>
+    </div>
+
+    <div class="row">
+        <div class="field-container"><button class="lock-btn" onclick="toggleLock('textwort')">🔓</button><label>Textwort</label><input type="text" id="textwort"></div>
+        <div class="field-container"><button class="lock-btn" onclick="toggleLock('lied1')">🔓</button><label>Eingangslied</label><input type="text" id="lied1"></div>
+        <div class="field-container"><button class="lock-btn" onclick="toggleLock('lied2')">🔓</button><label>Bußlied</label><input type="text" id="lied2"></div>
+        <div class="field-container"><button class="lock-btn" onclick="toggleLock('lied3')">🔓</button><label>Abendmahlslied</label><input type="text" id="lied3"></div>
+    </div>
+
+    <div class="row">
+        <div class="field-container"><button class="lock-btn" onclick="toggleLock('leiter')">🔓</button><label>Dienstleiter</label><input type="text" id="leiter"></div>
+        <div class="field-container"><button class="lock-btn" onclick="toggleLock('mit1')">🔓</button><label>1. Mitdienender</label><input type="text" id="mit1"></div>
+        <div class="field-container"><button class="lock-btn" onclick="toggleLock('mit2')">🔓</button><label>2. Mitdienender</label><input type="text" id="mit2"></div>
+    </div>
+
+    <span class="section-title">Kirchensaal (Tippe auf Zahl zum Ändern)</span>
+    <div class="row"><div class="counter-grid">
+        <div class="counter-card" id="card-saalGesamt"><button class="lock-btn" onclick="toggleCounterLock('saalGesamt')">🔓</button><span class="counter-label">Gesamt</span><div class="counter-controls"><button class="btn-count minus" onclick="updateCount('saalGesamt', -1)">-</button><span class="count-value" id="saalGesamt" onclick="editCount('saalGesamt')">0</span><button class="btn-count plus" onclick="updateCount('saalGesamt', 1)">+</button></div></div>
+        <div class="counter-card" id="card-saalKinder"><button class="lock-btn" onclick="toggleCounterLock('saalKinder')">🔓</button><span class="counter-label">Kinder</span><div class="counter-controls"><button class="btn-count minus" onclick="updateCount('saalKinder', -1)">-</button><span class="count-value" id="saalKinder" onclick="editCount('saalKinder')">0</span><button class="btn-count plus" onclick="updateCount('saalKinder', 1)">+</button></div></div>
+        <div class="counter-card" id="card-saalBesucher"><button class="lock-btn" onclick="toggleCounterLock('saalBesucher')">🔓</button><span class="counter-label">Besucher</span><div class="counter-controls"><button class="btn-count minus" onclick="updateCount('saalBesucher', -1)">-</button><span class="count-value" id="saalBesucher" onclick="editCount('saalBesucher')">0</span><button class="btn-count plus" onclick="updateCount('saalBesucher', 1)">+</button></div></div>
+        <div class="counter-card" id="card-saalGaeste"><button class="lock-btn" onclick="toggleCounterLock('saalGaeste')">🔓</button><span class="counter-label">Gäste</span><div class="counter-controls"><button class="btn-count minus" onclick="updateCount('saalGaeste', -1)">-</button><span class="count-value" id="saalGaeste" onclick="editCount('saalGaeste')">0</span><button class="btn-count plus" onclick="updateCount('saalGaeste', 1)">+</button></div></div>
+    </div></div>
+
+    <span class="section-title">Empore / Nebenräume</span>
+    <div class="row"><div class="counter-grid">
+        <div class="counter-card" id="card-empGesamt"><button class="lock-btn" onclick="toggleCounterLock('empGesamt')">🔓</button><span class="counter-label">Gesamt</span><div class="counter-controls"><button class="btn-count minus" onclick="updateCount('empGesamt', -1)">-</button><span class="count-value" id="empGesamt" onclick="editCount('empGesamt')">0</span><button class="btn-count plus" onclick="updateCount('empGesamt', 1)">+</button></div></div>
+        <div class="counter-card" id="card-empKinder"><button class="lock-btn" onclick="toggleCounterLock('empKinder')">🔓</button><span class="counter-label">Kinder</span><div class="counter-controls"><button class="btn-count minus" onclick="updateCount('empKinder', -1)">-</button><span class="count-value" id="empKinder" onclick="editCount('empKinder')">0</span><button class="btn-count plus" onclick="updateCount('empKinder', 1)">+</button></div></div>
+        <div class="counter-card" id="card-empBesucher"><button class="lock-btn" onclick="toggleCounterLock('empBesucher')">🔓</button><span class="counter-label">Besucher</span><div class="counter-controls"><button class="btn-count minus" onclick="updateCount('empBesucher', -1)">-</button><span class="count-value" id="empBesucher" onclick="editCount('empBesucher')">0</span><button class="btn-count plus" onclick="updateCount('empBesucher', 1)">+</button></div></div>
+        <div class="counter-card" id="card-empGaeste"><button class="lock-btn" onclick="toggleCounterLock('empGaeste')">🔓</button><span class="counter-label">Gäste</span><div class="counter-controls"><button class="btn-count minus" onclick="updateCount('empGaeste', -1)">-</button><span class="count-value" id="empGaeste" onclick="editCount('empGaeste')">0</span><button class="btn-count plus" onclick="updateCount('empGaeste', 1)">+</button></div></div>
+    </div></div>
+
+    <span class="section-title">Notizen</span>
+    <div class="row"><div class="field-container"><button class="lock-btn" onclick="toggleLock('notizen')">🔓</button><textarea id="notizen" rows="10"></textarea></div></div>
+
+    <button class="btn-pdf" onclick="generatePDF()">PDF ERZEUGEN</button>
+    <button class="btn-reset" onclick="resetAll()">Daten-Reset (Alles auf Null)</button>
+
+    <script>
+        function generatePDF() {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            doc.setFontSize(20); doc.text("GD-Erfassung", 105, 20, { align: "center" });
+            doc.setFontSize(12);
+            doc.text(`Datum: ${document.getElementById('datum').value}`, 20, 40);
+            doc.text(`Typ: ${document.getElementById('typ').value}`, 20, 50);
+            doc.text(`Zeit: ${document.getElementById('beginn').value} - ${document.getElementById('ende').value}`, 20, 60);
+            doc.text(`Leiter: ${document.getElementById('leiter').value}`, 20, 70);
+            doc.text(`Saal (Gesamt): ${document.getElementById('saalGesamt').innerText}`, 20, 90);
+            doc.text(`Empore (Gesamt): ${document.getElementById('empGesamt').innerText}`, 20, 100);
+            doc.text("Notizen:", 20, 120);
+            doc.text(doc.splitTextToSize(document.getElementById('notizen').value, 170), 20, 130);
+            doc.save("GD_Erfassung.pdf");
+        }
+    </script>
+</body>
+</html>
