@@ -47,10 +47,12 @@
           if (!el) return;
           if (data[id] !== undefined && data[id] !== null) {
             // always sync the value from DB (avoids innerText/value confusion)
-            el.value = data[id];
+            if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT') el.value = data[id];
+            else el.innerText = data[id];
           } else {
             // fallback auf leeren Wert
             if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT') el.value = "";
+            else el.innerText = "0";
           }
         });
       });
@@ -62,7 +64,7 @@
 
         const el = document.getElementById(id);
         if (!el) return;
-        const currentVal = parseInt(el.innerText, 10) || 0;
+        const currentVal = parseInt(el.innerText.replace(/\s/g, ''), 10) || 0;
         const newVal = currentVal + delta;
         
         if (newVal >= 0) {
@@ -81,10 +83,18 @@
         const currentVal = el.innerText;
         const newVal = prompt("Zahl manuell eingeben:", currentVal);
         
-        if (newVal !== null && newVal.trim() !== "" && !isNaN(newVal)) {
-          const num = parseInt(newVal, 10);
-          if (num >= 0) {
-            update(ref(db, 'aktuellerGD'), { [id]: num });
+        if (newVal !== null) {
+          const trimmed = newVal.trim();
+          if (trimmed === "") {
+            // allow clearing to 0
+            update(ref(db, 'aktuellerGD'), { [id]: 0 });
+          } else if (!isNaN(trimmed)) {
+            const num = parseInt(trimmed, 10);
+            if (num >= 0) {
+              update(ref(db, 'aktuellerGD'), { [id]: num });
+            }
+          } else {
+            alert("Ungültige Eingabe. Bitte eine Zahl eingeben.");
           }
         }
       };
@@ -93,14 +103,15 @@
         const el = document.getElementById(id);
         if (!el) return;
         const btn = el.parentElement.querySelector('.lock-btn');
-        el.disabled = !el.disabled;
-        if (el.disabled) {
-          if (btn) { btn.innerText = "🔒"; btn.classList.add('locked'); }
-          // Speichern des aktuellen Wertes in DB, wenn gesperrt wird
-          const valueToStore = el.value !== undefined ? el.value : "";
-          update(ref(db, 'aktuellerGD'), { [id]: valueToStore });
-        } else {
-          if (btn) { btn.innerText = "🔓"; btn.classList.remove('locked'); }
+        // for inputs/selects/textarea toggle disabled
+        if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT') {
+          el.disabled = !el.disabled;
+          const isDisabled = el.disabled;
+          if (btn) { btn.innerText = isDisabled ? "🔒" : "🔓"; btn.classList.toggle('locked', isDisabled); }
+          if (isDisabled) {
+            const valueToStore = el.value !== undefined ? el.value : "";
+            update(ref(db, 'aktuellerGD'), { [id]: valueToStore });
+          }
         }
       };
 
@@ -152,6 +163,8 @@
 
         .btn-pdf { width: 100%; background: #1a3a5a; color: white; padding: 20px; border: none; border-radius: 12px; font-size: 1.2em; font-weight: bold; cursor: pointer; margin-top: 20px; }
         .btn-reset { width: 100%; background: #e74c3c; color: white; padding: 10px; border: none; border-radius: 8px; font-size: 0.8em; cursor: pointer; margin-top: 10px; opacity: 0.9; }
+
+        .page-select { margin-top: 10px; display:flex; gap:10px; align-items:center; }
     </style>
 </head>
 <body>
@@ -330,74 +343,158 @@
         </div>
     </div>
 
+    <div class="row">
+      <div style="flex:1">
+        <label for="seitenwahl">PDF: Seitenanzahl</label>
+        <div class="page-select">
+          <select id="seitenwahl" style="padding:8px;border-radius:6px;border:1px solid #ddd;">
+            <option value="3">3 Seiten</option>
+            <option value="4">4 Seiten</option>
+          </select>
+          <small>Wähle 3 oder 4 Seiten für das PDF</small>
+        </div>
+      </div>
+    </div>
+
     <button type="button" class="btn-pdf" onclick="generatePDF()">PDF ERZEUGEN</button>
     <button type="button" class="btn-reset" onclick="resetAll()">Daten-Reset (Alles auf Null)</button>
 
     <script>
+        // PDF-Generierung mit wählbarer Seitenanzahl (3 oder 4)
         function generatePDF() {
-            const { jsPDF } = window.jspdf;
-            const doc = new jsPDF('p','mm','a4');
-            const left = 20;
-            let y = 20;
+            try {
+                const pages = parseInt(document.getElementById('seitenwahl').value, 10) || 3;
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF('p','mm','a4');
+                const left = 20;
+                const pageWidth = 210;
+                const contentWidth = pageWidth - left - 20;
 
-            doc.setFontSize(18);
-            doc.text("GD-Erfassung", 105, y, { align: "center" });
-            y += 10;
+                function writeRow(doc, label, value, yRef, extraSpacing = 7) {
+                  doc.setFont(undefined, 'bold'); doc.text(label + ": ", left, yRef.y);
+                  doc.setFont(undefined, 'normal');
+                  const lines = doc.splitTextToSize(String(value || ""), contentWidth - 40);
+                  doc.text(lines, left + 40, yRef.y);
+                  yRef.y += extraSpacing * (Array.isArray(lines) ? lines.length : 1);
+                  yRef.y += 2;
+                }
 
-            doc.setFontSize(11);
+                function getField(id) {
+                  const el = document.getElementById(id);
+                  if (!el) return "";
+                  if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT') return el.value;
+                  return el.innerText;
+                }
 
-            // Hilfsfunktion: schreibe Label und Wert, y wird zurückgegeben
-            function writeRow(label, value, extraSpacing = 7) {
-              doc.setFont(undefined, 'bold'); doc.text(label + ": ", left, y);
-              doc.setFont(undefined, 'normal');
-              const lines = doc.splitTextToSize(String(value || ""), 150);
-              doc.text(lines, left + 40, y);
-              // y um mehrere Zeilen erhöhen (jede Zeile ca. 7mm)
-              y += extraSpacing * (Array.isArray(lines) ? lines.length : 1);
-              y += 2;
+                function getCount(id) {
+                  const el = document.getElementById(id);
+                  if (!el) return "0";
+                  return el.innerText || "0";
+                }
+
+                // helper: reset y for each page
+                let yRef = { y: 20 };
+
+                // Page 1: Basisdaten
+                doc.setFontSize(18);
+                doc.text("GD-Erfassung", 105, yRef.y, { align: "center" });
+                yRef.y += 10;
+                doc.setFontSize(11);
+
+                writeRow(doc, "Datum", getField('datum'), yRef);
+                writeRow(doc, "Typ", getField('typ'), yRef);
+
+                const beg = getField('beginn') || "";
+                const end = getField('ende') || "";
+                let zeit = "";
+                if (beg && end) zeit = beg + " - " + end;
+                else if (beg) zeit = beg;
+                else if (end) zeit = end;
+                writeRow(doc, "Zeit", zeit, yRef);
+
+                writeRow(doc, "Textwort", getField('textwort'), yRef);
+                writeRow(doc, "Lied 1 (Eingang)", getField('lied1'), yRef);
+                writeRow(doc, "Lied 2 (Bußlied)", getField('lied2'), yRef);
+                writeRow(doc, "Lied 3 (Abendmahlslied)", getField('lied3'), yRef);
+                writeRow(doc, "Leiter", getField('leiter'), yRef);
+                writeRow(doc, "Mitdienender 1", getField('mit1'), yRef);
+                writeRow(doc, "Mitdienender 2", getField('mit2'), yRef);
+
+                // Decide how to split based on selected pages (3 or 4)
+                // For 3 pages: page2 = Kirchensaal + page3 = Empore + Notizen/Summary
+                // For 4 pages: page2 = Kirchensaal, page3 = Empore, page4 = Notizen + Summary
+                function addNewPage() {
+                  doc.addPage();
+                  yRef.y = 20;
+                }
+
+                // Page 2: Kirchensaal
+                addNewPage();
+                doc.setFont(undefined, 'bold');
+                doc.text("Kirchensaal", left, yRef.y);
+                yRef.y += 8;
+                doc.setFont(undefined, 'normal');
+                writeRow(doc, "Saal - Gesamt", getCount('saalGesamt'), yRef);
+                writeRow(doc, "Saal - Kinder", getCount('saalKinder'), yRef);
+                writeRow(doc, "Saal - Besucher", getCount('saalBesucher'), yRef);
+                writeRow(doc, "Saal - Gäste", getCount('saalGaeste'), yRef);
+
+                if (pages === 3) {
+                  // Page 3: Empore + Notizen/Summary
+                  addNewPage();
+                  doc.setFont(undefined, 'bold');
+                  doc.text("Empore / Nebenräume", left, yRef.y);
+                  yRef.y += 8;
+                  doc.setFont(undefined, 'normal');
+                  writeRow(doc, "Empore - Gesamt", getCount('empGesamt'), yRef);
+                  writeRow(doc, "Empore - Kinder", getCount('empKinder'), yRef);
+                  writeRow(doc, "Empore - Besucher", getCount('empBesucher'), yRef);
+                  writeRow(doc, "Empore - Gäste", getCount('empGaeste'), yRef);
+
+                  yRef.y += 6;
+                  writeRow(doc, "Notizen", getField('notizen'), yRef, 7);
+
+                  // summary (kurz)
+                  yRef.y += 6;
+                  doc.setFont(undefined, 'bold');
+                  doc.text("Zusammenfassung", left, yRef.y);
+                  yRef.y += 6;
+                  doc.setFont(undefined, 'normal');
+                  writeRow(doc, "Gesamt (Saal+Empore)", (
+                    (parseInt(getCount('saalGesamt')) || 0) + (parseInt(getCount('empGesamt')) || 0)
+                  ), yRef);
+                } else {
+                  // pages === 4
+                  // Page 3: Empore
+                  addNewPage();
+                  doc.setFont(undefined, 'bold');
+                  doc.text("Empore / Nebenräume", left, yRef.y);
+                  yRef.y += 8;
+                  doc.setFont(undefined, 'normal');
+                  writeRow(doc, "Empore - Gesamt", getCount('empGesamt'), yRef);
+                  writeRow(doc, "Empore - Kinder", getCount('empKinder'), yRef);
+                  writeRow(doc, "Empore - Besucher", getCount('empBesucher'), yRef);
+                  writeRow(doc, "Empore - Gäste", getCount('empGaeste'), yRef);
+
+                  // Page 4: Notizen + Summary
+                  addNewPage();
+                  writeRow(doc, "Notizen", getField('notizen'), yRef, 7);
+
+                  yRef.y += 6;
+                  doc.setFont(undefined, 'bold');
+                  doc.text("Zusammenfassung", left, yRef.y);
+                  yRef.y += 6;
+                  doc.setFont(undefined, 'normal');
+                  writeRow(doc, "Gesamt (Saal+Empore)", (
+                    (parseInt(getCount('saalGesamt')) || 0) + (parseInt(getCount('empGesamt')) || 0)
+                  ), yRef);
+                }
+
+                doc.save("GD_Erfassung.pdf");
+            } catch (err) {
+                console.error("Fehler beim Erzeugen des PDFs:", err);
+                alert("Fehler beim Erzeugen des PDFs. Details siehe Konsole.");
             }
-
-            writeRow("Datum", document.getElementById('datum').value);
-            writeRow("Typ", document.getElementById('typ').value);
-            writeRow("Zeit", (document.getElementById('beginn').value || "") + (document.getElementById('beginn').value || document.getElementById('ende').value ? " - " : "") + (document.getElementById('ende').value || ""));
-            writeRow("Textwort", document.getElementById('textwort').value);
-            writeRow("Lied 1 (Eingang)", document.getElementById('lied1').value);
-            writeRow("Lied 2 (Bußlied)", document.getElementById('lied2').value);
-            writeRow("Lied 3 (Abendmahlslied)", document.getElementById('lied3').value);
-            writeRow("Leiter", document.getElementById('leiter').value);
-            writeRow("Mitdienender 1", document.getElementById('mit1').value);
-            writeRow("Mitdienender 2", document.getElementById('mit2').value);
-
-            // Abstand vor Zähler
-            y += 4;
-            doc.setFont(undefined, 'bold');
-            doc.text("Kirchensaal", left, y);
-            y += 6;
-            doc.setFont(undefined, 'normal');
-            writeRow("Saal - Gesamt", document.getElementById('saalGesamt').innerText);
-            writeRow("Saal - Kinder", document.getElementById('saalKinder').innerText);
-            writeRow("Saal - Besucher", document.getElementById('saalBesucher').innerText);
-            writeRow("Saal - Gäste", document.getElementById('saalGaeste').innerText);
-
-            y += 2;
-            doc.setFont(undefined, 'bold');
-            doc.text("Empore / Nebenräume", left, y);
-            y += 6;
-            doc.setFont(undefined, 'normal');
-            writeRow("Empore - Gesamt", document.getElementById('empGesamt').innerText);
-            writeRow("Empore - Kinder", document.getElementById('empKinder').innerText);
-            writeRow("Empore - Besucher", document.getElementById('empBesucher').innerText);
-            writeRow("Empore - Gäste", document.getElementById('empGaeste').innerText);
-
-            y += 6;
-            writeRow("Notizen", document.getElementById('notizen').value, 7);
-
-            // Falls y zu groß wird: neue Seite (einfacher Schutz)
-            if (y > 270) {
-              // keine aufwändige Seitenlogik hier; jsPDF splittet Text bereits
-            }
-
-            doc.save("GD_Erfassung.pdf");
         }
     </script>
 </body>
