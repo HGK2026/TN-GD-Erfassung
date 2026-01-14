@@ -29,6 +29,32 @@
       const db = getDatabase(app);
       const dbRef = ref(db, 'aktuellerGD');
 
+      // Hilfsfunktion - Summen aktualisieren (Saal + Empore)
+      function updateTotalsUI(data) {
+        const get = (id) => {
+          if (data && data[id] !== undefined && data[id] !== null && data[id] !== "") return parseInt(data[id], 10) || 0;
+          // fallback auf das DOM falls DB-Daten fehlen
+          const el = document.getElementById(id);
+          if (!el) return 0;
+          const txt = (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT') ? el.value : el.innerText;
+          return parseInt(String(txt).replace(/\s/g, ''), 10) || 0;
+        };
+        const gesamt = get('saalGesamt') + get('empGesamt');
+        const kinder = get('saalKinder') + get('empKinder');
+        const besucher = get('saalBesucher') + get('empBesucher');
+        const gaeste = get('saalGaeste') + get('empGaeste');
+
+        const elG = document.getElementById('totalGesamt');
+        const elK = document.getElementById('totalKinder');
+        const elB = document.getElementById('totalBesucher');
+        const elGa = document.getElementById('totalGaeste');
+
+        if (elG) elG.innerText = String(gesamt);
+        if (elK) elK.innerText = String(kinder);
+        if (elB) elB.innerText = String(besucher);
+        if (elGa) elGa.innerText = String(gaeste);
+      }
+
       // Live-Synchronisierung
       onValue(dbRef, (snapshot) => {
         const data = snapshot.val() || {};
@@ -38,7 +64,7 @@
           if (!el) return;
           // Falls kein Wert im DB vorhanden, 0 anzeigen
           const value = (data[id] !== undefined && data[id] !== null && data[id] !== "") ? data[id] : 0;
-          el.innerText = value;
+          el.innerText = String(value);
         });
 
         const fields = ['datum', 'typ', 'beginn', 'ende', 'textwort', 'lied1', 'lied2', 'lied3', 'leiter', 'mit1', 'mit2', 'notizen'];
@@ -55,6 +81,9 @@
             else el.innerText = "0";
           }
         });
+
+        // Summen aktualisieren
+        updateTotalsUI(data);
       });
 
       // Klickvariante (+/-)
@@ -64,12 +93,22 @@
 
         const el = document.getElementById(id);
         if (!el) return;
-        const currentVal = parseInt(el.innerText.replace(/\s/g, ''), 10) || 0;
+        const currentVal = parseInt(String(el.innerText).replace(/\s/g, ''), 10) || 0;
         const newVal = currentVal + delta;
         
         if (newVal >= 0) {
-          // nur den Zahlenwert aktualisieren
-          update(ref(db, 'aktuellerGD'), { [id]: newVal });
+          // UI sofort aktualisieren (optimistisch) und DB updaten
+          el.innerText = String(newVal);
+          update(ref(db, 'aktuellerGD'), { [id]: newVal })
+            .catch(err => {
+              console.error("DB-Update fehlgeschlagen:", err);
+              // bei Fehler zurücksetzen (optional, wir versuchen UX zu erhalten)
+              el.innerText = String(currentVal);
+            })
+            .then(() => {
+              // nach erfolgreichem Update die Summen neu berechnen
+              updateTotalsUI();
+            });
         }
       };
 
@@ -87,11 +126,22 @@
           const trimmed = newVal.trim();
           if (trimmed === "") {
             // allow clearing to 0
-            update(ref(db, 'aktuellerGD'), { [id]: 0 });
+            el.innerText = "0";
+            update(ref(db, 'aktuellerGD'), { [id]: 0 })
+              .catch(e => console.error(e))
+              .then(() => updateTotalsUI());
           } else if (!isNaN(trimmed)) {
             const num = parseInt(trimmed, 10);
             if (num >= 0) {
-              update(ref(db, 'aktuellerGD'), { [id]: num });
+              el.innerText = String(num);
+              update(ref(db, 'aktuellerGD'), { [id]: num })
+                .catch(e => {
+                  console.error(e);
+                  // Rückfall
+                })
+                .then(() => updateTotalsUI());
+            } else {
+              alert("Bitte eine nicht-negative Zahl eingeben.");
             }
           } else {
             alert("Ungültige Eingabe. Bitte eine Zahl eingeben.");
@@ -110,7 +160,7 @@
           if (btn) { btn.innerText = isDisabled ? "🔒" : "🔓"; btn.classList.toggle('locked', isDisabled); }
           if (isDisabled) {
             const valueToStore = el.value !== undefined ? el.value : "";
-            update(ref(db, 'aktuellerGD'), { [id]: valueToStore });
+            update(ref(db, 'aktuellerGD'), { [id]: valueToStore }).catch(e => console.error(e));
           }
         }
       };
@@ -134,9 +184,53 @@
             datum: "", typ: "", beginn: "", ende: "",
             textwort: "", lied1: "", lied2: "", lied3: "", leiter: "", mit1: "", mit2: "", notizen: ""
           };
-          update(ref(db, 'aktuellerGD'), resetData);
+          update(ref(db, 'aktuellerGD'), resetData).catch(e => console.error(e));
         }
       };
+
+      // --- Pagination / Seitenaufteilung im UI ---
+      window.currentPage = 1;
+      window.totalPages = 3; // default to 3 (ändert sich bei Auswahl)
+      function showPage(n) {
+        const pages = document.querySelectorAll('.page');
+        pages.forEach((p, i) => {
+          p.style.display = (i+1 === n) ? 'block' : 'none';
+        });
+        window.currentPage = n;
+        document.getElementById('pageIndicator').innerText = `${n}/${window.totalPages}`;
+        // Wenn auf erster Seite, zeige Auswahl-Controls; ansonsten nicht
+      }
+      window.showPage = showPage;
+
+      window.setPages = function(n) {
+        const val = parseInt(n, 10) || 3;
+        window.totalPages = val;
+        // Sichtbarkeit der Seiten 3/4 beeinflusst nicht massive Struktur, nur Navigation:
+        // wir haben Seite1 = Basisdaten+Seitenwahl, Seite2 = Kirchensaal, Seite3 = Empore+Notizen (+ ggf. Seite4)
+        // Wenn 4 Seiten gewählt werden, Seite4 ist bereits vorhanden; wir blenden Seite3/4 entsprechend im Navigations-Text.
+        document.getElementById('seitenwahl').value = String(val); // synchronisieren PDF-Auswahl
+        // showPage(1); // optional: auf Seite 1 bleiben
+        document.getElementById('pageChoiceLabel').innerText = `${val} Seiten gewählt`;
+        document.getElementById('pageIndicator').innerText = `1/${window.totalPages}`;
+      };
+
+      window.nextPage = function() {
+        const next = Math.min(window.currentPage + 1, window.totalPages);
+        showPage(next);
+      };
+      window.prevPage = function() {
+        const prev = Math.max(window.currentPage - 1, 1);
+        showPage(prev);
+      };
+
+      // initial DOM-ready small handler (module scripts run after parsing head)
+      window.addEventListener('DOMContentLoaded', () => {
+        // ensure page elements exist
+        showPage(1);
+        // set pages from select if present
+        const sel = document.getElementById('seitenwahl');
+        if (sel) sel.value = sel.value || '3';
+      });
     </script>
 
     <style>
@@ -165,202 +259,272 @@
         .btn-reset { width: 100%; background: #e74c3c; color: white; padding: 10px; border: none; border-radius: 8px; font-size: 0.8em; cursor: pointer; margin-top: 10px; opacity: 0.9; }
 
         .page-select { margin-top: 10px; display:flex; gap:10px; align-items:center; }
+        /* Pagination */
+        .page { display: none; }
+        .page-nav { display:flex; justify-content: space-between; gap: 10px; align-items:center; margin-top: 10px; }
+        .page-nav button { padding: 8px 12px; border-radius: 8px; border: 1px solid #ddd; background: #fff; cursor: pointer; }
+        .totals-display { display:flex; gap:10px; flex-wrap: wrap; margin-top:10px; align-items:center; }
+        .total-item { background:#f8f9fa; padding:8px 12px; border-radius:8px; font-weight:700; border:1px solid #eee; }
     </style>
 </head>
 <body>
 
     <h1>GD-Erfassung</h1>
 
-    <div class="row">
-        <div class="field-container">
-            <button type="button" class="lock-btn" onclick="toggleLock('datum')">🔓</button>
-            <label>Datum</label>
-            <input type="date" id="datum">
-        </div>
-        <div class="field-container">
-            <button type="button" class="lock-btn" onclick="toggleLock('typ')">🔓</button>
-            <label>Gottesdienst-Typ</label>
-            <select id="typ">
-                <option value="Sonntagsgottesdienst">Sonntagsgottesdienst</option>
-                <option value="Wochengottesdienst">Wochengottesdienst</option>
-                <option value="Kindergottesdienst">Kindergottesdienst</option>
-                <option value="Jugendgottesdienst">Jugendgottesdienst</option>
-                <option value="Entschlafenengottesdienst">Entschlafenengottesdienst</option>
-                <option value="Anderer">Anderer</option>
+    <!-- Seite 1: Basisdaten + Seitenwahl -->
+    <div class="page" id="page-1">
+      <div class="row">
+          <div class="field-container">
+              <button type="button" class="lock-btn" onclick="toggleLock('datum')">🔓</button>
+              <label>Datum</label>
+              <input type="date" id="datum">
+          </div>
+          <div class="field-container">
+              <button type="button" class="lock-btn" onclick="toggleLock('typ')">🔓</button>
+              <label>Gottesdienst-Typ</label>
+              <select id="typ">
+                  <option value="Sonntagsgottesdienst">Sonntagsgottesdienst</option>
+                  <option value="Wochengottesdienst">Wochengottesdienst</option>
+                  <option value="Kindergottesdienst">Kindergottesdienst</option>
+                  <option value="Jugendgottesdienst">Jugendgottesdienst</option>
+                  <option value="Entschlafenengottesdienst">Entschlafenengottesdienst</option>
+                  <option value="Anderer">Anderer</option>
+              </select>
+          </div>
+      </div>
+
+      <div class="row">
+          <div class="field-container">
+              <button type="button" class="lock-btn" onclick="toggleLock('beginn')">🔓</button>
+              <label>Beginn</label>
+              <input type="time" id="beginn">
+          </div>
+          <div class="field-container">
+              <button type="button" class="lock-btn" onclick="toggleLock('ende')">🔓</button>
+              <label>Ende</label>
+              <input type="time" id="ende">
+          </div>
+      </div>
+
+      <div class="row">
+          <div class="field-container">
+              <button type="button" class="lock-btn" onclick="toggleLock('textwort')">🔓</button>
+              <label>Textwort</label>
+              <input type="text" id="textwort">
+          </div>
+          <div class="field-container">
+              <button type="button" class="lock-btn" onclick="toggleLock('lied1')">🔓</button>
+              <label>Eingangslied</label>
+              <input type="text" id="lied1">
+          </div>
+          <div class="field-container">
+              <button type="button" class="lock-btn" onclick="toggleLock('lied2')">🔓</button>
+              <label>Bußlied</label>
+              <input type="text" id="lied2">
+          </div>
+          <div class="field-container">
+              <button type="button" class="lock-btn" onclick="toggleLock('lied3')">🔓</button>
+              <label>Abendmahlslied</label>
+              <input type="text" id="lied3">
+          </div>
+      </div>
+
+      <div class="row">
+          <div class="field-container">
+              <button type="button" class="lock-btn" onclick="toggleLock('leiter')">🔓</button>
+              <label>Dienstleiter</label>
+              <input type="text" id="leiter">
+          </div>
+          <div class="field-container">
+              <button type="button" class="lock-btn" onclick="toggleLock('mit1')">🔓</button>
+              <label>1. Mitdienender</label>
+              <input type="text" id="mit1">
+          </div>
+          <div class="field-container">
+              <button type="button" class="lock-btn" onclick="toggleLock('mit2')">🔓</button>
+              <label>2. Mitdienender</label>
+              <input type="text" id="mit2">
+          </div>
+
+          <!-- Neu: Totale Zusammenfassung (Saal + Empore) -->
+          <div class="field-container" style="min-width:260px;">
+              <label>Summen (Saal + Empore)</label>
+              <div class="totals-display">
+                <div class="total-item">Gesamt: <span id="totalGesamt">0</span></div>
+                <div class="total-item">Kinder: <span id="totalKinder">0</span></div>
+                <div class="total-item">Besucher: <span id="totalBesucher">0</span></div>
+                <div class="total-item">G��ste: <span id="totalGaeste">0</span></div>
+              </div>
+          </div>
+      </div>
+
+      <div class="row">
+        <div style="flex:1">
+          <label id="pageChoiceLabel">Seiten für PDF wählen</label>
+          <div class="page-select">
+            <select id="seitenwahl" style="padding:8px;border-radius:6px;border:1px solid #ddd;" onchange="setPages(this.value)">
+              <option value="3">3 Seiten</option>
+              <option value="4">4 Seiten</option>
             </select>
-        </div>
-    </div>
-
-    <div class="row">
-        <div class="field-container">
-            <button type="button" class="lock-btn" onclick="toggleLock('beginn')">🔓</button>
-            <label>Beginn</label>
-            <input type="time" id="beginn">
-        </div>
-        <div class="field-container">
-            <button type="button" class="lock-btn" onclick="toggleLock('ende')">🔓</button>
-            <label>Ende</label>
-            <input type="time" id="ende">
-        </div>
-    </div>
-
-    <div class="row">
-        <div class="field-container">
-            <button type="button" class="lock-btn" onclick="toggleLock('textwort')">🔓</button>
-            <label>Textwort</label>
-            <input type="text" id="textwort">
-        </div>
-        <div class="field-container">
-            <button type="button" class="lock-btn" onclick="toggleLock('lied1')">🔓</button>
-            <label>Eingangslied</label>
-            <input type="text" id="lied1">
-        </div>
-        <div class="field-container">
-            <button type="button" class="lock-btn" onclick="toggleLock('lied2')">🔓</button>
-            <label>Bußlied</label>
-            <input type="text" id="lied2">
-        </div>
-        <div class="field-container">
-            <button type="button" class="lock-btn" onclick="toggleLock('lied3')">🔓</button>
-            <label>Abendmahlslied</label>
-            <input type="text" id="lied3">
-        </div>
-    </div>
-
-    <div class="row">
-        <div class="field-container">
-            <button type="button" class="lock-btn" onclick="toggleLock('leiter')">🔓</button>
-            <label>Dienstleiter</label>
-            <input type="text" id="leiter">
-        </div>
-        <div class="field-container">
-            <button type="button" class="lock-btn" onclick="toggleLock('mit1')">🔓</button>
-            <label>1. Mitdienender</label>
-            <input type="text" id="mit1">
-        </div>
-        <div class="field-container">
-            <button type="button" class="lock-btn" onclick="toggleLock('mit2')">🔓</button>
-            <label>2. Mitdienender</label>
-            <input type="text" id="mit2">
-        </div>
-    </div>
-
-    <span class="section-title">Kirchensaal (Tippe auf Zahl zum Ändern)</span>
-    <div class="row">
-        <div class="counter-grid">
-            <div class="counter-card" id="card-saalGesamt">
-                <button type="button" class="lock-btn" onclick="toggleCounterLock('saalGesamt')">🔓</button>
-                <span class="counter-label">Gesamt</span>
-                <div class="counter-controls">
-                    <button type="button" class="btn-count minus" onclick="updateCount('saalGesamt', -1)">-</button>
-                    <span id="saalGesamt" class="count-value" onclick="editCount('saalGesamt')">0</span>
-                    <button type="button" class="btn-count plus" onclick="updateCount('saalGesamt', 1)">+</button>
-                </div>
+            <small>Wähle 3 oder 4 Seiten für das PDF</small>
+          </div>
+          <div class="page-nav" style="margin-top:12px;">
+            <div>
+              <button onclick="showPage(1)">Erste Seite</button>
+              <button onclick="nextPage()">Weiter →</button>
             </div>
-
-            <div class="counter-card" id="card-saalKinder">
-                <button type="button" class="lock-btn" onclick="toggleCounterLock('saalKinder')">🔓</button>
-                <span class="counter-label">Kinder</span>
-                <div class="counter-controls">
-                    <button type="button" class="btn-count minus" onclick="updateCount('saalKinder', -1)">-</button>
-                    <span id="saalKinder" class="count-value" onclick="editCount('saalKinder')">0</span>
-                    <button type="button" class="btn-count plus" onclick="updateCount('saalKinder', 1)">+</button>
-                </div>
-            </div>
-
-            <div class="counter-card" id="card-saalBesucher">
-                <button type="button" class="lock-btn" onclick="toggleCounterLock('saalBesucher')">🔓</button>
-                <span class="counter-label">Besucher</span>
-                <div class="counter-controls">
-                    <button type="button" class="btn-count minus" onclick="updateCount('saalBesucher', -1)">-</button>
-                    <span id="saalBesucher" class="count-value" onclick="editCount('saalBesucher')">0</span>
-                    <button type="button" class="btn-count plus" onclick="updateCount('saalBesucher', 1)">+</button>
-                </div>
-            </div>
-
-            <div class="counter-card" id="card-saalGaeste">
-                <button type="button" class="lock-btn" onclick="toggleCounterLock('saalGaeste')">🔓</button>
-                <span class="counter-label">Gäste</span>
-                <div class="counter-controls">
-                    <button type="button" class="btn-count minus" onclick="updateCount('saalGaeste', -1)">-</button>
-                    <span id="saalGaeste" class="count-value" onclick="editCount('saalGaeste')">0</span>
-                    <button type="button" class="btn-count plus" onclick="updateCount('saalGaeste', 1)">+</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <span class="section-title">Empore / Nebenräume</span>
-    <div class="row">
-        <div class="counter-grid">
-            <div class="counter-card" id="card-empGesamt">
-                <button type="button" class="lock-btn" onclick="toggleCounterLock('empGesamt')">🔓</button>
-                <span class="counter-label">Gesamt</span>
-                <div class="counter-controls">
-                    <button type="button" class="btn-count minus" onclick="updateCount('empGesamt', -1)">-</button>
-                    <span id="empGesamt" class="count-value" onclick="editCount('empGesamt')">0</span>
-                    <button type="button" class="btn-count plus" onclick="updateCount('empGesamt', 1)">+</button>
-                </div>
-            </div>
-
-            <div class="counter-card" id="card-empKinder">
-                <button type="button" class="lock-btn" onclick="toggleCounterLock('empKinder')">🔓</button>
-                <span class="counter-label">Kinder</span>
-                <div class="counter-controls">
-                    <button type="button" class="btn-count minus" onclick="updateCount('empKinder', -1)">-</button>
-                    <span id="empKinder" class="count-value" onclick="editCount('empKinder')">0</span>
-                    <button type="button" class="btn-count plus" onclick="updateCount('empKinder', 1)">+</button>
-                </div>
-            </div>
-
-            <div class="counter-card" id="card-empBesucher">
-                <button type="button" class="lock-btn" onclick="toggleCounterLock('empBesucher')">🔓</button>
-                <span class="counter-label">Besucher</span>
-                <div class="counter-controls">
-                    <button type="button" class="btn-count minus" onclick="updateCount('empBesucher', -1)">-</button>
-                    <span id="empBesucher" class="count-value" onclick="editCount('empBesucher')">0</span>
-                    <button type="button" class="btn-count plus" onclick="updateCount('empBesucher', 1)">+</button>
-                </div>
-            </div>
-
-            <div class="counter-card" id="card-empGaeste">
-                <button type="button" class="lock-btn" onclick="toggleCounterLock('empGaeste')">🔓</button>
-                <span class="counter-label">Gäste</span>
-                <div class="counter-controls">
-                    <button type="button" class="btn-count minus" onclick="updateCount('empGaeste', -1)">-</button>
-                    <span id="empGaeste" class="count-value" onclick="editCount('empGaeste')">0</span>
-                    <button type="button" class="btn-count plus" onclick="updateCount('empGaeste', 1)">+</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <span class="section-title">Notizen</span>
-    <div class="row">
-        <div class="field-container">
-            <button type="button" class="lock-btn" onclick="toggleLock('notizen')">🔓</button>
-            <textarea id="notizen" rows="10"></textarea>
-        </div>
-    </div>
-
-    <div class="row">
-      <div style="flex:1">
-        <label for="seitenwahl">PDF: Seitenanzahl</label>
-        <div class="page-select">
-          <select id="seitenwahl" style="padding:8px;border-radius:6px;border:1px solid #ddd;">
-            <option value="3">3 Seiten</option>
-            <option value="4">4 Seiten</option>
-          </select>
-          <small>Wähle 3 oder 4 Seiten für das PDF</small>
+            <div>Seite: <span id="pageIndicator">1/3</span></div>
+          </div>
         </div>
       </div>
     </div>
 
-    <button type="button" class="btn-pdf" onclick="generatePDF()">PDF ERZEUGEN</button>
-    <button type="button" class="btn-reset" onclick="resetAll()">Daten-Reset (Alles auf Null)</button>
+    <!-- Seite 2: Kirchensaal (Zähler) -->
+    <div class="page" id="page-2">
+      <span class="section-title">Kirchensaal (Tippe auf Zahl zum Ändern)</span>
+      <div class="row">
+          <div class="counter-grid">
+              <div class="counter-card" id="card-saalGesamt">
+                  <button type="button" class="lock-btn" onclick="toggleCounterLock('saalGesamt')">🔓</button>
+                  <span class="counter-label">Gesamt</span>
+                  <div class="counter-controls">
+                      <button type="button" class="btn-count minus" onclick="updateCount('saalGesamt', -1)">-</button>
+                      <span id="saalGesamt" class="count-value" onclick="editCount('saalGesamt')">0</span>
+                      <button type="button" class="btn-count plus" onclick="updateCount('saalGesamt', 1)">+</button>
+                  </div>
+              </div>
+
+              <div class="counter-card" id="card-saalKinder">
+                  <button type="button" class="lock-btn" onclick="toggleCounterLock('saalKinder')">🔓</button>
+                  <span class="counter-label">Kinder</span>
+                  <div class="counter-controls">
+                      <button type="button" class="btn-count minus" onclick="updateCount('saalKinder', -1)">-</button>
+                      <span id="saalKinder" class="count-value" onclick="editCount('saalKinder')">0</span>
+                      <button type="button" class="btn-count plus" onclick="updateCount('saalKinder', 1)">+</button>
+                  </div>
+              </div>
+
+              <div class="counter-card" id="card-saalBesucher">
+                  <button type="button" class="lock-btn" onclick="toggleCounterLock('saalBesucher')">🔓</button>
+                  <span class="counter-label">Besucher</span>
+                  <div class="counter-controls">
+                      <button type="button" class="btn-count minus" onclick="updateCount('saalBesucher', -1)">-</button>
+                      <span id="saalBesucher" class="count-value" onclick="editCount('saalBesucher')">0</span>
+                      <button type="button" class="btn-count plus" onclick="updateCount('saalBesucher', 1)">+</button>
+                  </div>
+              </div>
+
+              <div class="counter-card" id="card-saalGaeste">
+                  <button type="button" class="lock-btn" onclick="toggleCounterLock('saalGaeste')">🔓</button>
+                  <span class="counter-label">Gäste</span>
+                  <div class="counter-controls">
+                      <button type="button" class="btn-count minus" onclick="updateCount('saalGaeste', -1)">-</button>
+                      <span id="saalGaeste" class="count-value" onclick="editCount('saalGaeste')">0</span>
+                      <button type="button" class="btn-count plus" onclick="updateCount('saalGaeste', 1)">+</button>
+                  </div>
+              </div>
+          </div>
+      </div>
+
+      <div class="page-nav">
+        <div>
+          <button onclick="prevPage()">← Zurück</button>
+          <button onclick="nextPage()">Weiter →</button>
+        </div>
+        <div>Seite: <span id="pageIndicator2">2/3</span></div>
+      </div>
+    </div>
+
+    <!-- Seite 3: Empore / Notizen (bei 4 Seiten gibt es zusätzlich Seite 4) -->
+    <div class="page" id="page-3">
+      <span class="section-title">Empore / Nebenräume</span>
+      <div class="row">
+          <div class="counter-grid">
+              <div class="counter-card" id="card-empGesamt">
+                  <button type="button" class="lock-btn" onclick="toggleCounterLock('empGesamt')">🔓</button>
+                  <span class="counter-label">Gesamt</span>
+                  <div class="counter-controls">
+                      <button type="button" class="btn-count minus" onclick="updateCount('empGesamt', -1)">-</button>
+                      <span id="empGesamt" class="count-value" onclick="editCount('empGesamt')">0</span>
+                      <button type="button" class="btn-count plus" onclick="updateCount('empGesamt', 1)">+</button>
+                  </div>
+              </div>
+
+              <div class="counter-card" id="card-empKinder">
+                  <button type="button" class="lock-btn" onclick="toggleCounterLock('empKinder')">🔓</button>
+                  <span class="counter-label">Kinder</span>
+                  <div class="counter-controls">
+                      <button type="button" class="btn-count minus" onclick="updateCount('empKinder', -1)">-</button>
+                      <span id="empKinder" class="count-value" onclick="editCount('empKinder')">0</span>
+                      <button type="button" class="btn-count plus" onclick="updateCount('empKinder', 1)">+</button>
+                  </div>
+              </div>
+
+              <div class="counter-card" id="card-empBesucher">
+                  <button type="button" class="lock-btn" onclick="toggleCounterLock('empBesucher')">🔓</button>
+                  <span class="counter-label">Besucher</span>
+                  <div class="counter-controls">
+                      <button type="button" class="btn-count minus" onclick="updateCount('empBesucher', -1)">-</button>
+                      <span id="empBesucher" class="count-value" onclick="editCount('empBesucher')">0</span>
+                      <button type="button" class="btn-count plus" onclick="updateCount('empBesucher', 1)">+</button>
+                  </div>
+              </div>
+
+              <div class="counter-card" id="card-empGaeste">
+                  <button type="button" class="lock-btn" onclick="toggleCounterLock('empGaeste')">🔓</button>
+                  <span class="counter-label">Gäste</span>
+                  <div class="counter-controls">
+                      <button type="button" class="btn-count minus" onclick="updateCount('empGaeste', -1)">-</button>
+                      <span id="empGaeste" class="count-value" onclick="editCount('empGaeste')">0</span>
+                      <button type="button" class="btn-count plus" onclick="updateCount('empGaeste', 1)">+</button>
+                  </div>
+              </div>
+          </div>
+      </div>
+
+      <span class="section-title">Notizen</span>
+      <div class="row">
+          <div class="field-container">
+              <button type="button" class="lock-btn" onclick="toggleLock('notizen')">🔓</button>
+              <textarea id="notizen" rows="10"></textarea>
+          </div>
+      </div>
+
+      <div class="page-nav">
+        <div>
+          <button onclick="prevPage()">← Zurück</button>
+          <button onclick="showPage(1)">Zur Startseite</button>
+        </div>
+        <div>Seite: <span id="pageIndicator3">3/3</span></div>
+      </div>
+    </div>
+
+    <!-- Optionale Seite 4 (falls gewählt) - hier wird dieselbe Notizen/Summary-Struktur angezeigt -->
+    <div class="page" id="page-4">
+      <div class="row">
+        <div style="flex:1">
+          <span class="section-title">Notizen (Seite 4)</span>
+          <textarea id="notizen_page4" rows="12" style="width:100%;padding:12px;border-radius:8px;border:1px solid #ddd;" oninput="document.getElementById('notizen').value = this.value;"></textarea>
+          <p style="margin-top:8px;">Hinweis: Diese Seite wird nur verwendet, wenn 4 Seiten gewählt wurden. Der Text wird in das Hauptfeld synchronisiert.</p>
+        </div>
+      </div>
+
+      <div class="page-nav">
+        <div>
+          <button onclick="prevPage()">← Zurück</button>
+          <button onclick="showPage(1)">Zur Startseite</button>
+        </div>
+        <div>Seite: <span id="pageIndicator4">4/4</span></div>
+      </div>
+    </div>
+
+    <div style="margin-top:12px;">
+      <button type="button" class="btn-pdf" onclick="generatePDF()">PDF ERZEUGEN</button>
+      <button type="button" class="btn-reset" onclick="resetAll()">Daten-Reset (Alles auf Null)</button>
+    </div>
 
     <script>
-        // PDF-Generierung mit wählbarer Seitenanzahl (3 oder 4)
+        // PDF-Generierung mit wählbarer Seitenanzahl (3 oder 4) - unverändert (nutzt die DOM-Felder)
         function generatePDF() {
             try {
                 const pages = parseInt(document.getElementById('seitenwahl').value, 10) || 3;
@@ -420,9 +584,6 @@
                 writeRow(doc, "Mitdienender 1", getField('mit1'), yRef);
                 writeRow(doc, "Mitdienender 2", getField('mit2'), yRef);
 
-                // Decide how to split based on selected pages (3 or 4)
-                // For 3 pages: page2 = Kirchensaal + page3 = Empore + Notizen/Summary
-                // For 4 pages: page2 = Kirchensaal, page3 = Empore, page4 = Notizen + Summary
                 function addNewPage() {
                   doc.addPage();
                   yRef.y = 20;
@@ -478,6 +639,12 @@
 
                   // Page 4: Notizen + Summary
                   addNewPage();
+                  // sync from optional notizen_page4 if used
+                  const n4 = document.getElementById('notizen_page4');
+                  if (n4) {
+                    const mainNotizen = document.getElementById('notizen');
+                    if (mainNotizen) mainNotizen.value = n4.value;
+                  }
                   writeRow(doc, "Notizen", getField('notizen'), yRef, 7);
 
                   yRef.y += 6;
@@ -496,6 +663,29 @@
                 alert("Fehler beim Erzeugen des PDFs. Details siehe Konsole.");
             }
         }
+
+        // kleine Sync: wenn Seitenwahl geändert wird, aktualisiere sichtbaren Indikator
+        document.addEventListener('DOMContentLoaded', () => {
+          const sel = document.getElementById('seitenwahl');
+          if (sel) {
+            sel.addEventListener('change', (e) => {
+              const v = parseInt(e.target.value, 10) || 3;
+              // Seiten-Indikatoren anpassen
+              document.getElementById('pageIndicator').innerText = `1/${v}`;
+              document.getElementById('pageIndicator2').innerText = (v>=2) ? `2/${v}` : `2/${v}`;
+              document.getElementById('pageIndicator3').innerText = (v>=3) ? `3/${v}` : `3/${v}`;
+              document.getElementById('pageIndicator4').innerText = `4/${v}`;
+              // set global
+              window.totalPages = v;
+            });
+          }
+        });
+
+        // initial show first page after DOM ready
+        document.addEventListener('DOMContentLoaded', () => {
+          // show page 1
+          if (typeof showPage === 'function') showPage(1);
+        });
     </script>
 </body>
 </html>
