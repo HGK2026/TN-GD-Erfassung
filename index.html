@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GD-Erfassung V3.4</title>
+    <title>GD-Erfassung V3.6</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
@@ -11,48 +11,58 @@
         :root { --primary: #1a3a5a; --accent: #27ae60; --danger: #e74c3c; --saal-bg: #e3f2fd; --emp-bg: #fdf5e6; }
         body { font-family: 'Segoe UI', sans-serif; max-width: 800px; margin: auto; padding: 5px; background: #f0f2f5; }
         
-        .header-top { display: flex; justify-content: space-between; align-items: center; padding: 10px; background: #fff; border-radius: 8px; margin-bottom: 5px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-        .status-box { display: flex; align-items: center; gap: 6px; font-size: 0.8em; font-weight: bold; }
-        #statusDot { width: 12px; height: 12px; border-radius: 50%; background: #999; border: 1px solid rgba(0,0,0,0.2); }
+        /* HEADER & STATUS */
+        .top-bar { 
+            display: flex; justify-content: space-between; align-items: center; 
+            padding: 12px; background: white; border-radius: 8px; margin-bottom: 8px; 
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1); border: 1px solid #ddd;
+        }
+        .status-indicator { 
+            display: flex; align-items: center; gap: 8px; font-size: 0.85em; font-weight: bold;
+            padding: 6px 12px; border-radius: 20px; background: #eee; border: 1px solid #ccc;
+        }
+        #statusDot { width: 12px; height: 12px; border-radius: 50%; background: #7f8c8d; }
 
+        /* NAVIGATION */
         .nav-header { display: flex; width: 100%; gap: 2px; margin-bottom: 5px; }
-        .nav-tab { flex: 1; padding: 15px 2px; border: none; background: #ccc; cursor: pointer; font-weight: bold; border-radius: 8px 8px 0 0; font-size: 0.85em; }
+        .nav-tab { flex: 1; padding: 15px 2px; border: none; background: #ccc; cursor: pointer; font-weight: bold; border-radius: 8px 8px 0 0; }
         .nav-tab.active { background: var(--primary); color: white; }
         
+        /* SEITEN */
         .page { background: white; padding: 15px; border-radius: 0 8px 8px 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); display: none; min-height: 70vh; }
-        
-        .row { display: flex; gap: 8px; margin-bottom: 10px; width: 100%; }
+        .row { display: flex; gap: 8px; margin-bottom: 10px; }
         .field-container { display: flex; flex-direction: column; flex: 1; }
-        label { font-size: 0.7em; font-weight: bold; color: #555; }
-        input, select, textarea { padding: 10px 5px; border: 1px solid #ccc; border-radius: 6px; font-size: 15px; width: 100%; }
+        label { font-size: 0.75em; font-weight: bold; color: #555; margin-bottom: 3px; }
+        input, select, textarea { padding: 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 16px; width: 100%; box-sizing: border-box; }
         
+        /* ZÄHLER */
         .counter-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px; }
-        .counter-card { padding: 10px; border-radius: 12px; text-align: center; border: 2px solid #ddd; background: white; position: relative; }
-        .count-value { font-size: 32px; font-weight: bold; display: block; margin: 5px 0; }
-        
-        .btn-count { width: 45%; height: 45px; font-size: 20px; border: none; border-radius: 10px; cursor: pointer; color: white; }
+        .counter-card { padding: 15px; border-radius: 12px; text-align: center; border: 2px solid #ddd; background: white; }
+        .count-value { font-size: 35px; font-weight: bold; display: block; margin: 10px 0; color: var(--primary); }
+        .btn-count { width: 45%; height: 50px; font-size: 24px; border: none; border-radius: 10px; cursor: pointer; color: white; font-weight: bold; }
         .plus { background: var(--accent); } .minus { background: var(--danger); }
 
-        .totals-bar { background: #f9f9f9; padding: 12px; border-radius: 10px; border: 2px solid var(--primary); }
-        .total-row { display: flex; justify-content: space-between; font-weight: bold; color: var(--primary); margin-bottom: 3px; }
+        .totals-box { background: #f9f9f9; padding: 15px; border-radius: 10px; border: 2px solid var(--primary); margin-top: 15px; }
+        .total-row { display: flex; justify-content: space-between; font-weight: bold; font-size: 1.2em; color: var(--primary); }
         
-        button.main-btn { width: 100%; padding: 15px; border-radius: 8px; border: none; font-weight: bold; cursor: pointer; margin-top: 10px; }
+        .action-btn { width: 100%; padding: 16px; border-radius: 10px; border: none; font-weight: bold; cursor: pointer; margin-top: 10px; font-size: 1em; }
     </style>
 </head>
 <body>
 
-    <div class="header-top">
-        <span style="font-weight: bold;">GD-Erfassung V3.4</span>
-        <div class="status-box">
+    <div class="top-bar">
+        <span style="font-weight: bold; color: var(--primary);">GD-PROTOOL V3.6</span>
+        <div class="status-indicator">
             <div id="statusDot"></div>
             <span id="statusText">Initialisiere...</span>
         </div>
     </div>
 
     <div class="nav-header">
-        <button class="nav-tab active" id="tab1" onclick="showPage(1)">1. Info</button>
-        <button class="nav-tab" id="tab2" onclick="showPage(2)">2. Saal</button>
-        <button class="nav-tab" id="tab3" onclick="showPage(3)">3. Empore</button>
+        <button class="nav-tab active" onclick="showPage(1)">1. Info</button>
+        <button class="nav-tab" onclick="showPage(2)">2. Saal</button>
+        <button class="nav-tab" onclick="showPage(3)">3. Empore</button>
+        <button class="nav-tab" onclick="showPage(4)">4. Notiz</button>
     </div>
 
     <div class="page" id="p1" style="display:block;">
@@ -66,45 +76,41 @@
                 </select>
             </div>
         </div>
-        <div class="row">
-            <div class="field-container"><label>Leiter</label><input type="text" id="leiter"></div>
-        </div>
-
-        <div class="totals-bar">
-            <div class="total-row"><span>Gesamt:</span><span id="totalGesamt">0</span></div>
-            <div class="total-row"><span>Kinder:</span><span id="totalKinder">0</span></div>
-        </div>
+        <div class="field-container"><label>Leiter</label><input type="text" id="leiter" placeholder="Name eintragen..."></div>
         
-        <button class="main-btn" style="background: #7f8c8d; color: white;" onclick="resetData()">RESET</button>
+        <div class="totals-box">
+            <div class="total-row"><span>GESAMT:</span><span id="totalGesamt">0</span></div>
+        </div>
+        <button class="action-btn" style="background: #95a5a6; color: white;" onclick="resetData()">DATEN ZURÜCKSETZEN</button>
     </div>
 
-    <div class="page" id="p2">
+    <div class="page" id="p2" style="background-color: var(--saal-bg);">
         <div class="counter-grid">
-            <div class="counter-card">
-                <label>SAAL GESAMT</label>
-                <span id="saalGesamt" class="count-value">0</span>
+            <div class="counter-card"><label>SAAL GESAMT</label><span id="saalGesamt" class="count-value">0</span>
                 <button class="btn-count minus" onclick="updateCount('saalGesamt', -1)">-</button>
                 <button class="btn-count plus" onclick="updateCount('saalGesamt', 1)">+</button>
             </div>
-            <div class="counter-card">
-                <label>KINDER</label>
-                <span id="saalKinder" class="count-value">0</span>
+            <div class="counter-card"><label>SAAL KINDER</label><span id="saalKinder" class="count-value">0</span>
                 <button class="btn-count minus" onclick="updateCount('saalKinder', -1)">-</button>
                 <button class="btn-count plus" onclick="updateCount('saalKinder', 1)">+</button>
             </div>
         </div>
     </div>
 
-    <div class="page" id="p3">
+    <div class="page" id="p3" style="background-color: var(--emp-bg);">
         <div class="counter-grid">
-            <div class="counter-card">
-                <label>EMPORE GESAMT</label>
-                <span id="empGesamt" class="count-value">0</span>
+            <div class="counter-card"><label>EMPORE GESAMT</label><span id="empGesamt" class="count-value">0</span>
                 <button class="btn-count minus" onclick="updateCount('empGesamt', -1)">-</button>
                 <button class="btn-count plus" onclick="updateCount('empGesamt', 1)">+</button>
             </div>
         </div>
     </div>
+
+    <div class="page" id="p4">
+        <textarea id="notizen" rows="15" placeholder="Notizen hier tippen..."></textarea>
+    </div>
+
+    <button class="action-btn" style="background: var(--accent); color: white;" onclick="generatePDF()">PDF PROTOKOLL ERSTELLEN</button>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-app.js";
@@ -120,53 +126,68 @@
             appId: "1:66241308714:web:d3390dc5681de2d8c0fb53"
         };
 
-        const app = initializeApp(firebaseConfig);
-        const db = getDatabase(app);
-        const dbRef = ref(db, 'aktuellerGD');
+        try {
+            const app = initializeApp(firebaseConfig);
+            const db = getDatabase(app);
+            const dbRef = ref(db, 'aktuellerGD');
 
-        // Verbindung prüfen
-        onValue(ref(db, ".info/connected"), (snap) => {
-            const dot = document.getElementById("statusDot");
-            const txt = document.getElementById("statusText");
-            if (snap.val() === true) {
-                dot.style.background = "#27ae60";
-                txt.innerText = "Online";
-            } else {
-                dot.style.background = "#e74c3c";
-                txt.innerText = "Verbindung fehlt";
-            }
-        });
-
-        // Daten empfangen
-        onValue(dbRef, (snapshot) => {
-            const data = snapshot.val() || {};
-            const ids = ['saalGesamt', 'saalKinder', 'empGesamt'];
-            ids.forEach(id => {
-                if(document.getElementById(id)) document.getElementById(id).innerText = data[id] || 0;
+            // 1. Status Überwachung
+            onValue(ref(db, ".info/connected"), (snap) => {
+                const dot = document.getElementById("statusDot");
+                const txt = document.getElementById("statusText");
+                if (snap.val() === true) {
+                    dot.style.background = "#27ae60";
+                    txt.innerText = "Online";
+                } else {
+                    dot.style.background = "#e74c3c";
+                    txt.innerText = "Offline";
+                }
             });
-            
-            const fields = ['datum', 'typ', 'leiter'];
-            fields.forEach(id => {
-                const el = document.getElementById(id);
-                if (el && data[id] !== undefined && document.activeElement !== el) el.value = data[id];
+
+            // 2. Daten Empfang & Sync
+            onValue(dbRef, (snapshot) => {
+                const data = snapshot.val() || {};
+                
+                // Zähler synchronisieren
+                ['saalGesamt', 'saalKinder', 'empGesamt'].forEach(id => {
+                    const el = document.getElementById(id);
+                    if(el) el.innerText = data[id] || 0;
+                });
+
+                // Textfelder synchronisieren
+                ['datum', 'typ', 'leiter', 'notizen'].forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el && data[id] !== undefined && document.activeElement !== el) {
+                        el.value = data[id];
+                    }
+                });
+
+                // Gesamtsumme berechnen
+                document.getElementById('totalGesamt').innerText = (data.saalGesamt || 0) + (data.empGesamt || 0);
             });
-            
-            // Summen berechnen
-            document.getElementById('totalGesamt').innerText = (data.saalGesamt || 0) + (data.empGesamt || 0);
-            document.getElementById('totalKinder').innerText = (data.saalKinder || 0);
-        });
 
-        // Funktionen global verfügbar machen
-        window.updateCount = (id, delta) => {
-            const current = parseInt(document.getElementById(id).innerText) || 0;
-            update(dbRef, { [id]: Math.max(0, current + delta) });
-        };
+            // 3. Funktionen für Buttons
+            window.updateCount = (id, delta) => {
+                const current = parseInt(document.getElementById(id).innerText) || 0;
+                update(dbRef, { [id]: Math.max(0, current + delta) });
+            };
 
-        window.resetData = () => {
-            if(confirm("Alles auf Null setzen?")) {
-                set(dbRef, { saalGesamt:0, saalKinder:0, empGesamt:0, datum:"", typ:"", leiter:"" });
-            }
-        };
+            window.resetData = () => {
+                if(confirm("Sicher? Alle Zähler und Texte werden für alle Benutzer gelöscht.")) {
+                    set(dbRef, { saalGesamt:0, saalKinder:0, empGesamt:0, datum:"", typ:"", leiter:"", notizen:"" });
+                }
+            };
+
+            // Notizen Live-Speicherung beim Tippen
+            document.getElementById('notizen').addEventListener('change', (e) => {
+                update(dbRef, { notizen: e.target.value });
+            });
+
+        } catch (error) {
+            console.error(error);
+            document.getElementById("statusText").innerText = "Ladefehler!";
+            document.getElementById("statusDot").style.background = "black";
+        }
     </script>
 
     <script>
@@ -174,7 +195,20 @@
             document.querySelectorAll('.page').forEach((p, i) => p.style.display = (i+1 === n) ? 'block' : 'none');
             document.querySelectorAll('.nav-tab').forEach((b, i) => b.classList.toggle('active', i+1 === n));
         }
-    </script>
 
+        function generatePDF() {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            doc.setFontSize(20);
+            doc.text("Gottesdienst Protokoll", 20, 20);
+            doc.setFontSize(12);
+            doc.text("Datum: " + document.getElementById('datum').value, 20, 40);
+            doc.text("Leiter: " + document.getElementById('leiter').value, 20, 50);
+            doc.text("Teilnehmer Gesamt: " + document.getElementById('totalGesamt').innerText, 20, 60);
+            doc.text("Notizen:", 20, 80);
+            doc.text(document.getElementById('notizen').value, 20, 90);
+            doc.save("GD_Protokoll.pdf");
+        }
+    </script>
 </body>
 </html>
