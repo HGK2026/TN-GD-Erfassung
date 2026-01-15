@@ -113,8 +113,9 @@
     <button class="action-btn" style="background: var(--accent); color: white;" onclick="generatePDF()">PDF PROTOKOLL ERSTELLEN</button>
 
     <script type="module">
-        import { initializeApp } from "https://gd-erfassungtool-default-rtdb.europe-west1.firebasedatabase.app";
-        import { getDatabase, ref, onValue, update, set } from "https://gd-erfassungtool-default-rtdb.europe-west1.firebasedatabase.app";
+        // Hier lagen die Fehler: Die URLs müssen zu gstatic.com führen!
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-app.js";
+        import { getDatabase, ref, onValue, update, set } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-database.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyBNehMzdBdfXKj8l1i3NxQgtWIkaCVnpHA",
@@ -163,12 +164,16 @@
                 });
 
                 // Gesamtsumme berechnen
-                document.getElementById('totalGesamt').innerText = (data.saalGesamt || 0) + (data.empGesamt || 0);
+                const saal = parseInt(data.saalGesamt) || 0;
+                const emp = parseInt(data.empGesamt) || 0;
+                document.getElementById('totalGesamt').innerText = saal + emp;
             });
 
-            // 3. Funktionen für Buttons
+            // 3. Funktionen für Buttons (Global machen)
             window.updateCount = (id, delta) => {
-                const current = parseInt(document.getElementById(id).innerText) || 0;
+                const el = document.getElementById(id);
+                if(!el) return;
+                const current = parseInt(el.innerText) || 0;
                 update(dbRef, { [id]: Math.max(0, current + delta) });
             };
 
@@ -178,13 +183,13 @@
                 }
             };
 
-            // Notizen Live-Speicherung beim Tippen
+            // Notizen Live-Speicherung
             document.getElementById('notizen').addEventListener('change', (e) => {
                 update(dbRef, { notizen: e.target.value });
             });
 
         } catch (error) {
-            console.error(error);
+            console.error("Firebase Error:", error);
             document.getElementById("statusText").innerText = "Ladefehler!";
             document.getElementById("statusDot").style.background = "black";
         }
