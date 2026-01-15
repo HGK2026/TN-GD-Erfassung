@@ -9,9 +9,8 @@
     
     <script type="module">
       import { initializeApp } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-app.js";
-      import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-database.js";
+      import { getDatabase, ref, onValue, update, set } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-database.js";
 
-      // Deine neuen Firebase Zugangsdaten
       const firebaseConfig = {
         apiKey: "AIzaSyBNehMzdBdfXKj8l1i3NxQgtWIkaCVnpHA",
         authDomain: "gd-erfassungtool.firebaseapp.com",
@@ -40,7 +39,6 @@
         document.getElementById('totalGaeste').innerText = val.saalGaeste + val.empGaeste;
       }
 
-      // Daten laden
       onValue(dbRef, (snapshot) => {
         const data = snapshot.val() || {};
         const counters = ['saalGesamt', 'saalKinder', 'saalBesucher', 'saalGaeste', 'empGesamt', 'empKinder', 'empBesucher', 'empGaeste'];
@@ -52,7 +50,6 @@
         const fields = ['datum', 'typ', 'beginn', 'ende', 'textwort', 'lied1', 'lied2', 'lied3', 'leiter', 'mit1', 'mit2', 'notizen'];
         fields.forEach(id => {
           const el = document.getElementById(id);
-          // Nur aktualisieren, wenn das Feld nicht gerade vom User bearbeitet wird (disabled ist)
           if (el && data[id] !== undefined) {
              if (el.type === 'textarea' || el.disabled) el.value = data[id];
              else if (!el.matches(':focus')) el.value = data[id];
@@ -61,7 +58,6 @@
         calculateTotals();
       });
 
-      // Funktionen global verfügbar machen
       window.updateCount = function(id, delta) {
         if (document.getElementById('card-' + id)?.classList.contains('locked')) return;
         const el = document.getElementById(id);
@@ -79,7 +75,6 @@
         const btn = document.getElementById('globalLockBtn');
         const fields = ['datum', 'typ', 'beginn', 'ende', 'textwort', 'lied1', 'lied2', 'lied3', 'leiter', 'mit1', 'mit2'];
         const isCurrentlyLocked = btn.innerText.includes("🔒");
-        
         fields.forEach(id => {
           const el = document.getElementById(id);
           const container = el.closest('.field-container');
@@ -87,7 +82,6 @@
           container.classList.toggle('is-locked', !isCurrentlyLocked);
           if (!isCurrentlyLocked) update(ref(db, 'aktuellerGD'), { [id]: el.value });
         });
-
         btn.innerText = isCurrentlyLocked ? "🔓 SEITE 1 BEARBEITEN" : "🔒 SEITE 1 SPERREN";
         btn.classList.toggle('locked-mode', !isCurrentlyLocked);
       };
@@ -96,6 +90,22 @@
         const card = document.getElementById('card-' + id);
         const isLocked = card.classList.toggle('locked');
         card.querySelector('.lock-icon').innerText = isLocked ? "🔒" : "🔓";
+      };
+
+      // RESET FUNKTION
+      window.resetData = function() {
+        if (confirm("Möchten Sie wirklich alle Daten für einen neuen Gottesdienst zurücksetzen? (Eingaben und Zähler werden gelöscht)")) {
+          const emptyData = {
+            datum: "", typ: "", beginn: "", ende: "", textwort: "", 
+            lied1: "", lied2: "", lied3: "", leiter: "", mit1: "", mit2: "", notizen: "",
+            saalGesamt: 0, saalKinder: 0, saalBesucher: 0, saalGaeste: 0,
+            empGesamt: 0, empKinder: 0, empBesucher: 0, empGaeste: 0
+          };
+          set(dbRef, emptyData);
+          // Schaltet Sperren aus, falls aktiv
+          const lockBtn = document.getElementById('globalLockBtn');
+          if (lockBtn.innerText.includes("🔒")) window.toggleGlobalLockPage1();
+        }
       };
 
       window.showPage = function(n) {
@@ -109,40 +119,32 @@
     <style>
         :root { --primary: #1a3a5a; --accent: #27ae60; --danger: #e74c3c; --saal-bg: #e3f2fd; --emp-bg: #fdf5e6; }
         body { font-family: 'Segoe UI', sans-serif; max-width: 800px; margin: auto; padding: 5px; background: #f0f2f5; }
-        
         .nav-header { display: flex; width: 100%; gap: 2px; margin-bottom: 5px; }
         .nav-tab { flex: 1; padding: 15px 2px; border: none; background: #ccc; cursor: pointer; font-weight: bold; border-radius: 8px 8px 0 0; font-size: 0.85em; }
         .nav-tab.active { background: var(--primary); color: white; }
-        
         .page { background: white; padding: 15px; border-radius: 0 8px 8px 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); display: none; min-height: 80vh; }
-        
         #globalLockBtn { width: 100%; padding: 12px; margin-bottom: 15px; border-radius: 8px; border: 2px solid var(--primary); background: white; font-weight: bold; cursor: pointer; }
         #globalLockBtn.locked-mode { background: var(--danger); color: white; border-color: var(--danger); }
-
         .row { display: flex; gap: 8px; margin-bottom: 10px; width: 100%; }
         .field-container { display: flex; flex-direction: column; min-width: 0; padding: 4px; border: 2px solid transparent; border-radius: 8px; box-sizing: border-box; flex: 1; }
         .field-container.is-locked { border-color: var(--danger) !important; background: #fff5f5; }
-
         label { font-size: 0.7em; font-weight: bold; color: #555; margin-bottom: 2px; }
         input, select, textarea { padding: 10px 6px; border: 1px solid #ccc; border-radius: 6px; font-size: 15px; width: 100%; box-sizing: border-box; }
-        
         .counter-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px; }
         .counter-card { padding: 10px; border-radius: 12px; text-align: center; border: 2px solid #ddd; background: white; position: relative; }
         .counter-card.locked { border-color: var(--danger); background: #fff0f0; }
         .lock-icon { cursor: pointer; font-size: 18px; position: absolute; top: 5px; left: 5px; }
-        
         .counter-controls { display: flex; justify-content: center; gap: 10px; margin-top: 8px; }
         .btn-count { width: 55px; height: 45px; font-size: 22px; border: none; border-radius: 10px; cursor: pointer; color: white; }
         .plus { background: var(--accent); } .minus { background: var(--danger); }
         .count-value { font-size: 28px; font-weight: bold; display: block; }
-
         .quick-add-area { border-top: 1px dashed #999; padding-top: 15px; display: flex; flex-direction: column; align-items: center; gap: 10px; }
         .btn-quick-xxl { width: 120px; height: 120px; color: white; border: none; border-radius: 20px; font-size: 60px; font-weight: bold; cursor: pointer; }
         #p2 .btn-quick-xxl { background: #1976d2; }
         #p3 .btn-quick-xxl { background: #8d6e63; }
-
         .totals-bar { background: #fff; padding: 12px; border-radius: 10px; border: 2px solid var(--primary); }
         .total-row { display: grid; grid-template-columns: 100px 10px 1fr; gap: 5px; font-weight: bold; color: var(--primary); font-size: 1.1em; }
+        .btn-reset-global { width: 100%; padding: 10px; background: #7f8c8d; color: white; border: none; border-radius: 8px; font-size: 0.9em; margin-top: 25px; cursor: pointer; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -187,13 +189,15 @@
             <div class="field-container"><label>Abendmahl</label><input type="text" id="lied3"></div>
         </div>
 
-        <h4 style="margin: 10px 0 5px 5px;">Gesamtergebnis (Saal + Empore)</h4>
+        <h4 style="margin: 10px 0 5px 5px;">Gesamtergebnis</h4>
         <div class="totals-bar">
             <div class="total-row"><span>Gesamt</span><span>:</span><span id="totalGesamt">0</span></div>
             <div class="total-row"><span>Kinder</span><span>:</span><span id="totalKinder">0</span></div>
             <div class="total-row"><span>Besucher</span><span>:</span><span id="totalBesucher">0</span></div>
             <div class="total-row"><span>Gäste</span><span>:</span><span id="totalGaeste">0</span></div>
         </div>
+
+        <button class="btn-reset-global" onclick="resetData()">NEUEN GOTTESDIENST STARTEN (RESET)</button>
     </div>
 
     <div class="page" id="p2" style="background-color: var(--saal-bg);">
@@ -244,7 +248,6 @@
             
             doc.line(20, 80, 190, 80);
             doc.setFontSize(14); doc.text("Teilnehmerstatistik", 20, 90);
-            doc.setFontSize(11);
             doc.text(`Saal:    Gesamt: ${getV('saalGesamt')} | Kinder: ${getV('saalKinder')} | Besucher: ${getV('saalBesucher')} | Gäste: ${getV('saalGaeste')}`, 20, 100);
             doc.text(`Empore:  Gesamt: ${getV('empGesamt')} | Kinder: ${getV('empKinder')} | Besucher: ${getV('empBesucher')} | Gäste: ${getV('empGaeste')}`, 20, 110);
             
@@ -252,7 +255,7 @@
             doc.text(`SUMME:   Gesamt: ${getV('totalGesamt')} | Kinder: ${getV('totalKinder')} | Besucher: ${getV('totalBesucher')} | Gäste: ${getV('totalGaeste')}`, 20, 125);
             
             doc.line(20, 135, 190, 135);
-            doc.setTextColor(0,0,0); doc.setFontSize(12); doc.text("Notizen:", 20, 145);
+            doc.setTextColor(0,0,0); doc.text("Notizen:", 20, 145);
             const splitNotizen = doc.splitTextToSize(getV('notizen'), 170);
             doc.text(splitNotizen, 20, 155);
             
