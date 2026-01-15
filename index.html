@@ -102,14 +102,15 @@
         import { getDatabase, ref, onValue, update, set } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-database.js";
 
         const firebaseConfig = {
-            apiKey: "AIzaSyBNehMzdBdfXKj8l1i3NxQgtWIkaCVnpHA",
-            authDomain: "gd-erfassungtool.firebaseapp.com",
-            databaseURL: "https://gd-erfassungtool-default-rtdb.europe-west1.firebasedatabase.app",
-            projectId: "gd-erfassungtool",
-            storageBucket: "gd-erfassungtool.firebasestorage.app",
-            messagingSenderId: "66241308714",
-            appId: "1:66241308714:web:d3390dc5681de2d8c0fb53"
-        };
+    apiKey: "AIzaSyBNehMzdBdfXKj8l1i3NxQgtWIkaCVnpHA",
+    authDomain: "gd-erfassungtool.firebaseapp.com",
+    // TESTE DIESE URL (oder die, die du kopiert hast):
+    databaseURL: "https://gd-erfassungtool.europe-west1.firebasedatabase.app", 
+    projectId: "gd-erfassungtool",
+    storageBucket: "gd-erfassungtool.firebasestorage.app",
+    messagingSenderId: "66241308714",
+    appId: "1:66241308714:web:d3390dc5681de2d8c0fb53"
+};
 
         try {
             const app = initializeApp(firebaseConfig);
