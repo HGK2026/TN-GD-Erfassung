@@ -3,142 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GD-Erfassung V3.2</title>
+    <title>GD-Erfassung V3.3</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     
-    <script type="module">
-      import { initializeApp } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-app.js";
-      import { getDatabase, ref, onValue, update, set, onDisconnect } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-database.js";
-
-      const firebaseConfig = {
-        apiKey: "AIzaSyBNehMzdBdfXKj8l1i3NxQgtWIkaCVnpHA",
-        authDomain: "gd-erfassungtool.firebaseapp.com",
-        databaseURL: "https://gd-erfassungtool-default-rtdb.europe-west1.firebasedatabase.app",
-        projectId: "gd-erfassungtool",
-        storageBucket: "gd-erfassungtool.firebasestorage.app",
-        messagingSenderId: "66241308714",
-        appId: "1:66241308714:web:d3390dc5681de2d8c0fb53",
-        measurementId: "G-4WMBES6Q24"
-      };
-
-      const app = initializeApp(firebaseConfig);
-      const db = getDatabase(app);
-      const dbRef = ref(db, 'aktuellerGD');
-
-      // VERBINDUNGS-STATUS ANZEIGEN
-      const connectedRef = ref(db, ".info/connected");
-      onValue(connectedRef, (snap) => {
-        const statusDot = document.getElementById("statusDot");
-        const statusText = document.getElementById("statusText");
-        if (snap.val() === true) {
-          statusDot.style.background = "#27ae60"; // Grün
-          statusText.innerText = "Verbunden";
-        } else {
-          statusDot.style.background = "#e74c3c"; // Rot
-          statusText.innerText = "Offline";
-        }
-      });
-
-      function calculateTotals() {
-        const ids = ['saalGesamt', 'saalKinder', 'saalBesucher', 'saalGaeste', 'empGesamt', 'empKinder', 'empBesucher', 'empGaeste'];
-        const val = {};
-        ids.forEach(id => {
-          const el = document.getElementById(id);
-          val[id] = el ? parseInt(el.innerText) || 0 : 0;
-        });
-        document.getElementById('totalGesamt').innerText = val.saalGesamt + val.empGesamt;
-        document.getElementById('totalKinder').innerText = val.saalKinder + val.empKinder;
-        document.getElementById('totalBesucher').innerText = val.saalBesucher + val.empBesucher;
-        document.getElementById('totalGaeste').innerText = val.saalGaeste + val.empGaeste;
-      }
-
-      // ECHTZEIT-DATEN LADEN
-      onValue(dbRef, (snapshot) => {
-        const data = snapshot.val() || {};
-        
-        // Zähler
-        const counters = ['saalGesamt', 'saalKinder', 'saalBesucher', 'saalGaeste', 'empGesamt', 'empKinder', 'empBesucher', 'empGaeste'];
-        counters.forEach(id => {
-          const el = document.getElementById(id);
-          if (el) el.innerText = data[id] !== undefined ? data[id] : 0;
-        });
-
-        // Textfelder
-        const fields = ['datum', 'typ', 'beginn', 'ende', 'textwort', 'lied1', 'lied2', 'lied3', 'leiter', 'mit1', 'mit2', 'notizen'];
-        fields.forEach(id => {
-          const el = document.getElementById(id);
-          if (el && data[id] !== undefined) {
-            // Nur aktualisieren, wenn das Feld gesperrt ist oder man nicht gerade drin tippt
-            if (el.disabled || document.activeElement !== el) {
-              el.value = data[id];
-            }
-          }
-        });
-        calculateTotals();
-      });
-
-      window.updateCount = function(id, delta) {
-        if (document.getElementById('card-' + id)?.classList.contains('locked')) return;
-        const el = document.getElementById(id);
-        const current = parseInt(el.innerText) || 0;
-        const newVal = Math.max(0, current + delta);
-        update(ref(db, 'aktuellerGD'), { [id]: newVal });
-      };
-
-      window.quickAdd = function(targetId) {
-        const val = document.getElementById(targetId).value;
-        window.updateCount(val, 1);
-      };
-
-      window.toggleGlobalLockPage1 = function() {
-        const btn = document.getElementById('globalLockBtn');
-        const fields = ['datum', 'typ', 'beginn', 'ende', 'textwort', 'lied1', 'lied2', 'lied3', 'leiter', 'mit1', 'mit2'];
-        const isCurrentlyLocked = btn.innerText.includes("🔒");
-        
-        fields.forEach(id => {
-          const el = document.getElementById(id);
-          el.disabled = !isCurrentlyLocked;
-          el.closest('.field-container').classList.toggle('is-locked', !isCurrentlyLocked);
-          if (!isCurrentlyLocked) update(ref(db, 'aktuellerGD'), { [id]: el.value });
-        });
-
-        btn.innerText = isCurrentlyLocked ? "🔓 SEITE 1 BEARBEITEN" : "🔒 SEITE 1 SPERREN";
-        btn.classList.toggle('locked-mode', !isCurrentlyLocked);
-      };
-
-      window.toggleCounterLock = function(id) {
-        const card = document.getElementById('card-' + id);
-        const isLocked = card.classList.toggle('locked');
-        card.querySelector('.lock-icon').innerText = isLocked ? "🔒" : "🔓";
-      };
-
-      window.resetData = function() {
-        if (confirm("Wirklich alles für einen neuen GD zurücksetzen?")) {
-          set(dbRef, {
-            saalGesamt: 0, saalKinder: 0, saalBesucher: 0, saalGaeste: 0,
-            empGesamt: 0, empKinder: 0, empBesucher: 0, empGaeste: 0,
-            datum: "", typ: "", beginn: "", ende: "", textwort: "",
-            lied1: "", lied2: "", lied3: "", leiter: "", mit1: "", mit2: "", notizen: ""
-          });
-        }
-      };
-
-      window.showPage = function(n) {
-        document.querySelectorAll('.page').forEach((p, i) => p.style.display = (i+1 === n) ? 'block' : 'none');
-        document.querySelectorAll('.nav-tab').forEach((b, i) => b.classList.toggle('active', i+1 === n));
-      };
-
-      window.addEventListener('DOMContentLoaded', () => window.showPage(1));
-    </script>
-
     <style>
         :root { --primary: #1a3a5a; --accent: #27ae60; --danger: #e74c3c; --saal-bg: #e3f2fd; --emp-bg: #fdf5e6; }
-        body { font-family: 'Segoe UI', sans-serif; max-width: 800px; margin: auto; padding: 5px; background: #f0f2f5; position: relative; }
+        body { font-family: 'Segoe UI', sans-serif; max-width: 800px; margin: auto; padding: 5px; background: #f0f2f5; }
         
-        /* Status Anzeige */
-        .status-container { position: absolute; top: 10px; right: 10px; display: flex; align-items: center; gap: 5px; font-size: 0.7em; font-weight: bold; background: rgba(255,255,255,0.8); padding: 2px 8px; border-radius: 10px; z-index: 100; }
-        #statusDot { width: 8px; height: 8px; border-radius: 50%; background: #999; }
+        /* Status-Leiste */
+        .header-top { display: flex; justify-content: space-between; align-items: center; padding: 5px 10px; background: #fff; border-radius: 8px; margin-bottom: 5px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .status-box { display: flex; align-items: center; gap: 6px; font-size: 0.8em; font-weight: bold; }
+        #statusDot { width: 10px; height: 10px; border-radius: 50%; background: #999; border: 1px solid rgba(0,0,0,0.2); }
 
         .nav-header { display: flex; width: 100%; gap: 2px; margin-bottom: 5px; }
         .nav-tab { flex: 1; padding: 15px 2px; border: none; background: #ccc; cursor: pointer; font-weight: bold; border-radius: 8px 8px 0 0; font-size: 0.85em; }
@@ -173,14 +49,17 @@
 
         .totals-bar { background: #fff; padding: 12px; border-radius: 10px; border: 2px solid var(--primary); }
         .total-row { display: grid; grid-template-columns: 100px 10px 1fr; gap: 5px; font-weight: bold; color: var(--primary); font-size: 1.1em; }
-        .btn-reset { width: 100%; padding: 10px; background: #7f8c8d; color: white; border: none; border-radius: 8px; margin-top: 20px; cursor: pointer; }
+        .btn-reset { width: 100%; padding: 10px; background: #7f8c8d; color: white; border: none; border-radius: 8px; margin-top: 20px; cursor: pointer; font-weight: bold; }
     </style>
 </head>
 <body>
 
-    <div class="status-container">
-        <div id="statusDot"></div>
-        <span id="statusText">Verbinde...</span>
+    <div class="header-top">
+        <span style="font-weight: bold; color: var(--primary);">GD-Erfassung V3.3</span>
+        <div class="status-box">
+            <div id="statusDot"></div>
+            <span id="statusText">Verbinde...</span>
+        </div>
     </div>
 
     <div class="nav-header">
@@ -192,37 +71,25 @@
 
     <div class="page" id="p1" style="display:block;">
         <button id="globalLockBtn" onclick="toggleGlobalLockPage1()">🔓 SEITE 1 BEARBEITEN</button>
-        
         <div class="row">
             <div class="field-container"><label>Datum</label><input type="date" id="datum"></div>
             <div class="field-container"><label>Beginn</label><input type="time" id="beginn"></div>
             <div class="field-container"><label>Ende</label><input type="time" id="ende"></div>
         </div>
-        
         <div class="row">
             <div class="field-container"><label>Typ</label>
                 <select id="typ">
                     <option value="">Wählen...</option>
                     <option>Sonntagsgottesdienst</option><option>Wochengottesdienst</option><option>Festgottesdienst</option>
                     <option>Jugendgottesdienst</option><option>Kindergottesdienst</option><option>Ämtergottesdienst</option>
-                    <option>Trostgottesdienst</option><option>Jugendtreffen</option><option>Seminar</option>
                 </select>
             </div>
             <div class="field-container"><label>Textwort</label><input type="text" id="textwort"></div>
         </div>
-
         <div class="row">
             <div class="field-container"><label>Leiter</label><input type="text" id="leiter"></div>
             <div class="field-container"><label>Mitd. 1</label><input type="text" id="mit1"></div>
-            <div class="field-container"><label>Mitd. 2</label><input type="text" id="mit2"></div>
         </div>
-
-        <div class="row">
-            <div class="field-container"><label>Eingang</label><input type="text" id="lied1"></div>
-            <div class="field-container"><label>Bußlied</label><input type="text" id="lied2"></div>
-            <div class="field-container"><label>Abendmahl</label><input type="text" id="lied3"></div>
-        </div>
-
         <h4 style="margin: 10px 0 5px 5px;">Gesamtergebnis</h4>
         <div class="totals-bar">
             <div class="total-row"><span>Gesamt</span><span>:</span><span id="totalGesamt">0</span></div>
@@ -230,8 +97,7 @@
             <div class="total-row"><span>Besucher</span><span>:</span><span id="totalBesucher">0</span></div>
             <div class="total-row"><span>Gäste</span><span>:</span><span id="totalGaeste">0</span></div>
         </div>
-
-        <button class="btn-reset" onclick="resetData()">NEUEN GD STARTEN (RESET)</button>
+        <button class="btn-reset" onclick="resetData()">RESET (NEUER GD)</button>
     </div>
 
     <div class="page" id="p2" style="background-color: var(--saal-bg);">
@@ -242,7 +108,7 @@
             <div class="counter-card" id="card-saalGaeste"><span class="lock-icon" onclick="toggleCounterLock('saalGaeste')">🔓</span><label>GÄSTE</label><span id="saalGaeste" class="count-value">0</span><div class="counter-controls"><button class="btn-count minus" onclick="updateCount('saalGaeste', -1)">-</button><button class="btn-count plus" onclick="updateCount('saalGaeste', 1)">+</button></div></div>
         </div>
         <div class="quick-add-area">
-            <select id="saalQuickSel"><option value="saalGesamt">Ziel: Gesamt</option><option value="saalKinder">Ziel: Kinder</option><option value="saalBesucher">Ziel: Besucher</option><option value="saalGaeste">Ziel: Gäste</option></select>
+            <select id="saalQuickSel" style="width:200px; height:40px;"><option value="saalGesamt">Ziel: Gesamt</option><option value="saalKinder">Ziel: Kinder</option><option value="saalBesucher">Ziel: Besucher</option><option value="saalGaeste">Ziel: Gäste</option></select>
             <button class="btn-quick-xxl" onclick="quickAdd('saalQuickSel')">＋</button>
         </div>
     </div>
@@ -255,7 +121,7 @@
             <div class="counter-card" id="card-empGaeste"><span class="lock-icon" onclick="toggleCounterLock('empGaeste')">🔓</span><label>GÄSTE</label><span id="empGaeste" class="count-value">0</span><div class="counter-controls"><button class="btn-count minus" onclick="updateCount('empGaeste', -1)">-</button><button class="btn-count plus" onclick="updateCount('empGaeste', 1)">+</button></div></div>
         </div>
         <div class="quick-add-area">
-            <select id="empQuickSel"><option value="empGesamt">Ziel: Gesamt</option><option value="empKinder">Ziel: Kinder</option><option value="empBesucher">Ziel: Besucher</option><option value="empGaeste">Ziel: Gäste</option></select>
+            <select id="empQuickSel" style="width:200px; height:40px;"><option value="empGesamt">Ziel: Gesamt</option><option value="empKinder">Ziel: Kinder</option><option value="empBesucher">Ziel: Besucher</option><option value="empGaeste">Ziel: Gäste</option></select>
             <button class="btn-quick-xxl" onclick="quickAdd('empQuickSel')">＋</button>
         </div>
     </div>
@@ -264,16 +130,109 @@
 
     <button onclick="generatePDF()" style="width:100%; padding:18px; background:var(--accent); color:white; border:none; border-radius:10px; font-size:1.2em; font-weight:bold; margin-top:8px; cursor:pointer;">PDF PROTOKOLL ERZEUGEN</button>
 
+    <script type="module">
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-app.js";
+      import { getDatabase, ref, onValue, update, set } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-database.js";
+
+      const firebaseConfig = {
+        apiKey: "AIzaSyBNehMzdBdfXKj8l1i3NxQgtWIkaCVnpHA",
+        authDomain: "gd-erfassungtool.firebaseapp.com",
+        databaseURL: "https://gd-erfassungtool-default-rtdb.europe-west1.firebasedatabase.app",
+        projectId: "gd-erfassungtool",
+        storageBucket: "gd-erfassungtool.firebasestorage.app",
+        messagingSenderId: "66241308714",
+        appId: "1:66241308714:web:d3390dc5681de2d8c0fb53",
+        measurementId: "G-4WMBES6Q24"
+      };
+
+      const app = initializeApp(firebaseConfig);
+      const db = getDatabase(app);
+      const dbRef = ref(db, 'aktuellerGD');
+
+      // Online Status Überwachung
+      const connectedRef = ref(db, ".info/connected");
+      onValue(connectedRef, (snap) => {
+        const dot = document.getElementById("statusDot");
+        const txt = document.getElementById("statusText");
+        if (snap.val() === true) {
+          dot.style.background = "#27ae60";
+          txt.innerText = "Online";
+        } else {
+          dot.style.background = "#e74c3c";
+          txt.innerText = "Offline";
+        }
+      });
+
+      function calculateTotals() {
+        const ids = ['saalGesamt', 'saalKinder', 'saalBesucher', 'saalGaeste', 'empGesamt', 'empKinder', 'empBesucher', 'empGaeste'];
+        let v = {};
+        ids.forEach(id => { v[id] = parseInt(document.getElementById(id).innerText) || 0; });
+        document.getElementById('totalGesamt').innerText = v.saalGesamt + v.empGesamt;
+        document.getElementById('totalKinder').innerText = v.saalKinder + v.empKinder;
+        document.getElementById('totalBesucher').innerText = v.saalBesucher + v.empBesucher;
+        document.getElementById('totalGaeste').innerText = v.saalGaeste + v.empGaeste;
+      }
+
+      onValue(dbRef, (snapshot) => {
+        const data = snapshot.val() || {};
+        const counters = ['saalGesamt', 'saalKinder', 'saalBesucher', 'saalGaeste', 'empGesamt', 'empKinder', 'empBesucher', 'empGaeste'];
+        counters.forEach(id => { if(document.getElementById(id)) document.getElementById(id).innerText = data[id] || 0; });
+
+        const fields = ['datum', 'typ', 'beginn', 'ende', 'textwort', 'leiter', 'mit1', 'notizen'];
+        fields.forEach(id => {
+          const el = document.getElementById(id);
+          if (el && data[id] !== undefined && document.activeElement !== el) el.value = data[id];
+        });
+        calculateTotals();
+      });
+
+      window.updateCount = function(id, delta) {
+        if (document.getElementById('card-' + id).classList.contains('locked')) return;
+        const current = parseInt(document.getElementById(id).innerText) || 0;
+        update(dbRef, { [id]: Math.max(0, current + delta) });
+      };
+
+      window.quickAdd = function(selId) { window.updateCount(document.getElementById(selId).value, 1); };
+
+      window.toggleGlobalLockPage1 = function() {
+        const btn = document.getElementById('globalLockBtn');
+        const isLocked = btn.innerText.includes("🔒");
+        const fields = ['datum', 'typ', 'beginn', 'ende', 'textwort', 'leiter', 'mit1'];
+        fields.forEach(id => {
+          const el = document.getElementById(id);
+          el.disabled = !isLocked;
+          if(!isLocked) update(dbRef, { [id]: el.value });
+        });
+        btn.innerText = isLocked ? "🔓 SEITE 1 BEARBEITEN" : "🔒 SEITE 1 SPERREN";
+        btn.classList.toggle('locked-mode', !isLocked);
+      };
+
+      window.toggleCounterLock = function(id) {
+        const card = document.getElementById('card-' + id);
+        const locked = card.classList.toggle('locked');
+        card.querySelector('.lock-icon').innerText = locked ? "🔒" : "🔓";
+      };
+
+      window.resetData = function() {
+        if(confirm("Alles löschen?")) {
+          set(dbRef, { saalGesamt:0, saalKinder:0, saalBesucher:0, saalGaeste:0, empGesamt:0, empKinder:0, empBesucher:0, empGaeste:0, datum:"", typ:"", beginn:"", ende:"", textwort:"", leiter:"", mit1:"", notizen:"" });
+        }
+      };
+
+      window.showPage = function(n) {
+        document.querySelectorAll('.page').forEach((p, i) => p.style.display = (i+1 === n) ? 'block' : 'none');
+        document.querySelectorAll('.nav-tab').forEach((b, i) => b.classList.toggle('active', i+1 === n));
+      };
+    </script>
+
     <script>
         function generatePDF() {
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF();
-            const getV = (id) => document.getElementById(id).value || document.getElementById(id).innerText;
-            doc.text("Dienstprotokoll", 20, 20);
-            doc.text(`Datum: ${getV('datum')}`, 20, 30);
-            doc.text(`Gesamt: ${getV('totalGesamt')}`, 20, 40);
-            // ... (restliche PDF Logik)
-            doc.save(`Protokoll_${getV('datum')}.pdf`);
+            doc.text("Gottesdienst Protokoll", 20, 20);
+            doc.text("Datum: " + document.getElementById('datum').value, 20, 30);
+            doc.text("Gesamtteilnehmer: " + document.getElementById('totalGesamt').innerText, 20, 40);
+            doc.save("Protokoll.pdf");
         }
     </script>
 </body>
