@@ -9,17 +9,18 @@
     
     <script type="module">
       import { initializeApp } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-app.js";
-      import { getDatabase, ref, set, onValue, update } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-database.js";
+      import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-database.js";
 
+      // Deine neuen Firebase Zugangsdaten
       const firebaseConfig = {
-        apiKey: "AIzaSyBSduIxEC1XtD37ppTgSaQtHImkXG1ofi4",
-        authDomain: "gd-erfassung.firebaseapp.com",
-        projectId: "gd-erfassung",
-        databaseURL: "https://gd-erfassung-default-rtdb.europe-west1.firebasedatabase.app",
-        storageBucket: "gd-erfassung.firebasestorage.app",
-        messagingSenderId: "451038031834",
-        appId: "1:451038031834:web:a420355561350904a99ae3",
-        measurementId: "G-CXB7W3WE7J"
+        apiKey: "AIzaSyBNehMzdBdfXKj8l1i3NxQgtWIkaCVnpHA",
+        authDomain: "gd-erfassungtool.firebaseapp.com",
+        databaseURL: "https://gd-erfassungtool-default-rtdb.europe-west1.firebasedatabase.app",
+        projectId: "gd-erfassungtool",
+        storageBucket: "gd-erfassungtool.firebasestorage.app",
+        messagingSenderId: "66241308714",
+        appId: "1:66241308714:web:d3390dc5681de2d8c0fb53",
+        measurementId: "G-4WMBES6Q24"
       };
 
       const app = initializeApp(firebaseConfig);
@@ -39,6 +40,7 @@
         document.getElementById('totalGaeste').innerText = val.saalGaeste + val.empGaeste;
       }
 
+      // Daten laden
       onValue(dbRef, (snapshot) => {
         const data = snapshot.val() || {};
         const counters = ['saalGesamt', 'saalKinder', 'saalBesucher', 'saalGaeste', 'empGesamt', 'empKinder', 'empBesucher', 'empGaeste'];
@@ -50,24 +52,27 @@
         const fields = ['datum', 'typ', 'beginn', 'ende', 'textwort', 'lied1', 'lied2', 'lied3', 'leiter', 'mit1', 'mit2', 'notizen'];
         fields.forEach(id => {
           const el = document.getElementById(id);
-          if (el && data[id] !== undefined) el.value = data[id];
+          // Nur aktualisieren, wenn das Feld nicht gerade vom User bearbeitet wird (disabled ist)
+          if (el && data[id] !== undefined) {
+             if (el.type === 'textarea' || el.disabled) el.value = data[id];
+             else if (!el.matches(':focus')) el.value = data[id];
+          }
         });
         calculateTotals();
       });
 
+      // Funktionen global verfügbar machen
       window.updateCount = function(id, delta) {
         if (document.getElementById('card-' + id)?.classList.contains('locked')) return;
         const el = document.getElementById(id);
         const current = parseInt(el.innerText) || 0;
         const newVal = Math.max(0, current + delta);
-        el.innerText = newVal;
-        calculateTotals();
         update(ref(db, 'aktuellerGD'), { [id]: newVal });
       };
 
       window.quickAdd = function(targetId) {
         const val = document.getElementById(targetId).value;
-        updateCount(val, 1);
+        window.updateCount(val, 1);
       };
 
       window.toggleGlobalLockPage1 = function() {
@@ -98,7 +103,7 @@
         document.querySelectorAll('.nav-tab').forEach((b, i) => b.classList.toggle('active', i+1 === n));
       };
 
-      window.addEventListener('DOMContentLoaded', () => showPage(1));
+      window.addEventListener('DOMContentLoaded', () => window.showPage(1));
     </script>
 
     <style>
