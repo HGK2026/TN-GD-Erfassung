@@ -99,39 +99,43 @@
     <script>
         const googleUrl = "https://script.google.com/macros/s/AKfycbxm4Fd5LUjIqBYi6INMyIvERO_IjPSDtmNBrFZwOKYvNeDc_btu0J60bDIggmwTHxt0LQ/exec";
 
-        // Beim Start: Heutige Planung laden
-        window.onload = function() {
-            document.getElementById('datum').valueAsDate = new Date();
-            ladePlanung();
-        };
+       // Beim Laden der Seite
+window.onload = function() {
+    // Heute setzen
+    var heute = new Date();
+    var offset = heute.getTimezoneOffset();
+    heute = new Date(heute.getTime() - (offset*60*1000));
+    document.getElementById('datum').value = heute.toISOString().split('T')[0];
+    
+    // Planung für heute laden
+    ladePlanung();
+};
 
-        function ladePlanung() {
-    const datum = document.getElementById('datum').value;
-    console.log("Suche Planung für: " + datum);
+function ladePlanung() {
+    const datumVal = document.getElementById('datum').value;
+    if(!datumVal) return;
+
+    // Kleiner visueller Hinweis
+    console.log("Lade Daten für: " + datumVal);
 
     google.script.run
-        .withSuccessHandler(function(planung) {
-            if (planung && !planung.error) {
-                console.log("Daten gefunden:", planung);
-                document.getElementById('typ').value = planung.typ;
-                document.getElementById('textwort').value = planung.textwort;
-                document.getElementById('leiter').value = planung.leiter;
-                document.getElementById('lied1').value = planung.lied1;
-                document.getElementById('lied2').value = planung.lied2;
-                document.getElementById('lied3').value = planung.lied3;
-                document.getElementById('notizen').value = planung.notizen;
-            } else {
-                console.log(planung ? planung.error : "Keine Antwort vom Server");
-                // Felder leeren, wenn nichts gefunden wurde
-                ['typ', 'textwort', 'leiter', 'lied1', 'lied2', 'lied3', 'notizen'].forEach(id => {
-                    document.getElementById(id).value = "";
-                });
-            }
-        })
-        .withFailureHandler(function(err) {
-            console.error("Script-Fehler:", err);
-        })
-        .getPlanungsDaten(datum);
+      .withSuccessHandler(function(planung) {
+        if (planung && !planung.error) {
+            document.getElementById('typ').value = planung.typ;
+            document.getElementById('textwort').value = planung.textwort;
+            document.getElementById('leiter').value = planung.leiter;
+            document.getElementById('lied1').value = planung.lied1;
+            document.getElementById('lied2').value = planung.lied2;
+            document.getElementById('lied3').value = planung.lied3;
+            document.getElementById('notizen').value = planung.notizen;
+        } else {
+            // Wenn nichts gefunden wurde: Felder leeren (außer Datum/Zeit)
+            const leeren = ['typ', 'textwort', 'leiter', 'lied1', 'lied2', 'lied3', 'notizen'];
+            leeren.forEach(id => document.getElementById(id).value = "");
+            console.log(planung.error);
+        }
+      })
+      .getPlanungsDaten(datumVal);
 }
 
         function showPage(n) {
