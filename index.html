@@ -3,32 +3,29 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GD-Erfassung V5.0</title>
+    <title>GD-Erfassung V6.0 Planung</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <style>
         :root { --primary: #1a3a5a; --accent: #27ae60; --danger: #e74c3c; --saal-bg: #e3f2fd; --emp-bg: #fdf5e6; }
         body { font-family: 'Segoe UI', sans-serif; max-width: 800px; margin: auto; padding: 5px; background: #f0f2f5; }
         .nav-header { display: flex; width: 100%; gap: 2px; margin-bottom: 5px; }
-        .nav-tab { flex: 1; padding: 15px 2px; border: none; background: #ccc; cursor: pointer; font-weight: bold; border-radius: 8px 8px 0 0; font-size: 0.85em; }
+        .nav-tab { flex: 1; padding: 15px 2px; border: none; background: #ccc; cursor: pointer; font-weight: bold; border-radius: 8px 8px 0 0; }
         .nav-tab.active { background: var(--primary); color: white; }
         .page { background: white; padding: 15px; border-radius: 0 8px 8px 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); display: none; min-height: 80vh; }
-        #globalLockBtn { width: 100%; padding: 12px; margin-bottom: 15px; border-radius: 8px; border: 2px solid var(--primary); background: white; font-weight: bold; cursor: pointer; }
-        #globalLockBtn.locked-mode { background: var(--danger); color: white; border-color: var(--danger); }
+        #globalLockBtn { width: 100%; padding: 12px; margin-bottom: 15px; border-radius: 8px; border: 2px solid var(--primary); background: white; font-weight: bold; }
+        #globalLockBtn.locked-mode { background: var(--danger); color: white; }
         .row { display: flex; gap: 8px; margin-bottom: 10px; }
         .field-container { display: flex; flex-direction: column; flex: 1; padding: 4px; border: 2px solid transparent; }
         .field-container.is-locked { border-color: var(--danger); background: #fff5f5; border-radius: 8px; }
-        label { font-size: 0.75em; font-weight: bold; color: #555; margin-bottom: 2px; }
-        input, select, textarea { padding: 10px 6px; border: 1px solid #ccc; border-radius: 6px; font-size: 15px; width: 100%; box-sizing: border-box; }
-        .counter-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px; }
-        .counter-card { padding: 10px; border-radius: 12px; text-align: center; border: 2px solid #ddd; background: white; position: relative; }
+        label { font-size: 0.75em; font-weight: bold; color: #555; }
+        input, select, textarea { padding: 10px 6px; border: 1px solid #ccc; border-radius: 6px; font-size: 15px; width: 100%; }
+        .counter-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .counter-card { padding: 10px; border-radius: 12px; text-align: center; border: 2px solid #ddd; background: white; }
         .btn-count { width: 50px; height: 45px; font-size: 22px; border: none; border-radius: 10px; color: white; cursor: pointer; }
         .plus { background: var(--accent); } .minus { background: var(--danger); }
         .count-value { font-size: 28px; font-weight: bold; display: block; }
-        .quick-add-area { border-top: 1px dashed #999; padding-top: 15px; display: flex; flex-direction: column; align-items: center; gap: 10px; }
-        .btn-quick-xxl { width: 100px; height: 100px; color: white; border: none; border-radius: 50%; font-size: 50px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.2); background: #1976d2; }
         .totals-bar { background: #fff; padding: 12px; border-radius: 10px; border: 2px solid var(--primary); display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-        .total-item { font-weight: bold; color: var(--primary); font-size: 1em; border-bottom: 1px solid #eee; padding: 5px 0; }
-        .total-val { float: right; color: #000; font-size: 1.1em; }
+        .total-val { float: right; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -42,73 +39,87 @@
 
     <div class="page" id="p1" style="display:block;">
         <button id="globalLockBtn" onclick="toggleGlobalLockPage1()">🔓 SEITE 1 BEARBEITEN</button>
+        
         <div class="row">
-            <div class="field-container"><label>Datum</label><input type="date" id="datum"></div>
+            <div class="field-container"><label>Datum</label><input type="date" id="datum" onchange="ladePlanung()"></div>
             <div class="field-container"><label>Beginn</label><input type="time" id="beginn"></div>
             <div class="field-container"><label>Ende</label><input type="time" id="ende"></div>
         </div>
+        
         <div class="row">
-            <div class="field-container"><label>Gottesdienst-Typ</label>
-                <select id="typ">
-                    <option>Sonntagsgottesdienst</option><option>Mittwochsgottesdienst</option><option>Ämtergottesdienst</option>
-                    <option>Kindergottesdienst</option><option>Jugendgottesdienst</option><option>Ämterstunde</option>
-                    <option>Jugendstunde</option><option>Seminar</option>
-                </select>
-            </div>
+            <div class="field-container"><label>Typ</label><input type="text" id="typ"></div>
             <div class="field-container"><label>Textwort</label><input type="text" id="textwort"></div>
         </div>
+
         <div class="row">
             <div class="field-container"><label>Leiter</label><input type="text" id="leiter"></div>
             <div class="field-container"><label>Mitd. 1</label><input type="text" id="mit1"></div>
             <div class="field-container"><label>Mitd. 2</label><input type="text" id="mit2"></div>
         </div>
+
         <div class="row">
             <div class="field-container"><label>Eingangslied</label><input type="text" id="lied1"></div>
             <div class="field-container"><label>Bußlied</label><input type="text" id="lied2"></div>
             <div class="field-container"><label>Abendmahl</label><input type="text" id="lied3"></div>
         </div>
-        <h4 style="margin: 15px 0 5px 5px; color: var(--primary);">Live-Übersicht (Summen)</h4>
+
+        <h4 style="color: var(--primary);">Live-Summen</h4>
         <div class="totals-bar">
-            <div class="total-item">Gesamt: <span id="totalGesamt" class="total-val">0</span></div>
-            <div class="total-item">Besucher: <span id="totalBesucher" class="total-val">0</span></div>
-            <div class="total-item">Kinder: <span id="totalKinder" class="total-val">0</span></div>
-            <div class="total-item">Gäste: <span id="totalGaeste" class="total-val">0</span></div>
+            <div>Gesamt: <span id="totalGesamt" class="total-val">0</span></div>
+            <div>Besucher: <span id="totalBesucher" class="total-val">0</span></div>
+            <div>Kinder: <span id="totalKinder" class="total-val">0</span></div>
+            <div>Gäste: <span id="totalGaeste" class="total-val">0</span></div>
         </div>
+
         <button onclick="saveAndPDF()" style="width:100%; padding:18px; background:var(--accent); color:white; border:none; border-radius:10px; font-weight:bold; margin-top:20px; cursor:pointer;">💾 SPEICHERN & RESET</button>
     </div>
 
     <div class="page" id="p2" style="background-color: var(--saal-bg);">
-        <h3 style="text-align:center; margin-top:0;">SAAL</h3>
+        <h3 style="text-align:center;">SAAL</h3>
         <div class="counter-grid">
-            <div class="counter-card"><label>GESAMT</label><span id="saalGesamt" class="count-value">0</span><div class="counter-controls"><button class="btn-count minus" onclick="updateCount('saalGesamt', -1)">-</button><button class="btn-count plus" onclick="updateCount('saalGesamt', 1)">+</button></div></div>
-            <div class="counter-card"><label>BESUCHER</label><span id="saalBesucher" class="count-value">0</span><div class="counter-controls"><button class="btn-count minus" onclick="updateCount('saalBesucher', -1)">-</button><button class="btn-count plus" onclick="updateCount('saalBesucher', 1)">+</button></div></div>
-            <div class="counter-card"><label>KINDER</label><span id="saalKinder" class="count-value">0</span><div class="counter-controls"><button class="btn-count minus" onclick="updateCount('saalKinder', -1)">-</button><button class="btn-count plus" onclick="updateCount('saalKinder', 1)">+</button></div></div>
-            <div class="counter-card"><label>GÄSTE</label><span id="saalGaeste" class="count-value">0</span><div class="counter-controls"><button class="btn-count minus" onclick="updateCount('saalGaeste', -1)">-</button><button class="btn-count plus" onclick="updateCount('saalGaeste', 1)">+</button></div></div>
-        </div>
-        <div class="quick-add-area">
-            <select id="saalQuickSel"><option value="saalGesamt">Gesamt</option><option value="saalBesucher">Besucher</option><option value="saalKinder">Kinder</option><option value="saalGaeste">Gäste</option></select>
-            <button class="btn-quick-xxl" onclick="quickAdd('saalQuickSel')">＋</button>
+            <div class="counter-card"><label>GESAMT</label><span id="saalGesamt" class="count-value">0</span><button class="btn-count minus" onclick="updateCount('saalGesamt', -1)">-</button><button class="btn-count plus" onclick="updateCount('saalGesamt', 1)">+</button></div>
+            <div class="counter-card"><label>BESUCHER</label><span id="saalBesucher" class="count-value">0</span><button class="btn-count minus" onclick="updateCount('saalBesucher', -1)">-</button><button class="btn-count plus" onclick="updateCount('saalBesucher', 1)">+</button></div>
+            <div class="counter-card"><label>KINDER</label><span id="saalKinder" class="count-value">0</span><button class="btn-count minus" onclick="updateCount('saalKinder', -1)">-</button><button class="btn-count plus" onclick="updateCount('saalKinder', 1)">+</button></div>
+            <div class="counter-card"><label>GÄSTE</label><span id="saalGaeste" class="count-value">0</span><button class="btn-count minus" onclick="updateCount('saalGaeste', -1)">-</button><button class="btn-count plus" onclick="updateCount('saalGaeste', 1)">+</button></div>
         </div>
     </div>
 
     <div class="page" id="p3" style="background-color: var(--emp-bg);">
-        <h3 style="text-align:center; margin-top:0;">EMPORE</h3>
+        <h3 style="text-align:center;">EMPORE</h3>
         <div class="counter-grid">
-            <div class="counter-card"><label>GESAMT</label><span id="empGesamt" class="count-value">0</span><div class="counter-controls"><button class="btn-count minus" onclick="updateCount('empGesamt', -1)">-</button><button class="btn-count plus" onclick="updateCount('empGesamt', 1)">+</button></div></div>
-            <div class="counter-card"><label>BESUCHER</label><span id="empBesucher" class="count-value">0</span><div class="counter-controls"><button class="btn-count minus" onclick="updateCount('empBesucher', -1)">-</button><button class="btn-count plus" onclick="updateCount('empBesucher', 1)">+</button></div></div>
-            <div class="counter-card"><label>KINDER</label><span id="empKinder" class="count-value">0</span><div class="counter-controls"><button class="btn-count minus" onclick="updateCount('empKinder', -1)">-</button><button class="btn-count plus" onclick="updateCount('empKinder', 1)">+</button></div></div>
-            <div class="counter-card"><label>GÄSTE</label><span id="empGaeste" class="count-value">0</span><div class="counter-controls"><button class="btn-count minus" onclick="updateCount('empGaeste', -1)">-</button><button class="btn-count plus" onclick="updateCount('empGaeste', 1)">+</button></div></div>
-        </div>
-        <div class="quick-add-area">
-            <select id="empQuickSel"><option value="empGesamt">Gesamt</option><option value="empBesucher">Besucher</option><option value="empKinder">Kinder</option><option value="empGaeste">Gäste</option></select>
-            <button class="btn-quick-xxl" onclick="quickAdd('empQuickSel')">＋</button>
+            <div class="counter-card"><label>GESAMT</label><span id="empGesamt" class="count-value">0</span><button class="btn-count minus" onclick="updateCount('empGesamt', -1)">-</button><button class="btn-count plus" onclick="updateCount('empGesamt', 1)">+</button></div>
+            <div class="counter-card"><label>BESUCHER</label><span id="empBesucher" class="count-value">0</span><button class="btn-count minus" onclick="updateCount('empBesucher', -1)">-</button><button class="btn-count plus" onclick="updateCount('empBesucher', 1)">+</button></div>
+            <div class="counter-card"><label>KINDER</label><span id="empKinder" class="count-value">0</span><button class="btn-count minus" onclick="updateCount('empKinder', -1)">-</button><button class="btn-count plus" onclick="updateCount('empKinder', 1)">+</button></div>
+            <div class="counter-card"><label>GÄSTE</label><span id="empGaeste" class="count-value">0</span><button class="btn-count minus" onclick="updateCount('empGaeste', -1)">-</button><button class="btn-count plus" onclick="updateCount('empGaeste', 1)">+</button></div>
         </div>
     </div>
 
     <div class="page" id="p4"><textarea id="notizen" rows="18" placeholder="Notizen..."></textarea></div>
 
     <script>
-        const googleUrl = "https://script.google.com/macros/s/AKfycbyfOqYO4L0nklmbHuA_uTAJpdmkwQfBbEBsNSLGL0tl3wQPplPpcICeJ51rkctHXsHcCw/exec";
+        const googleUrl = "https://script.google.com/macros/s/AKfycbz7mkR909JxLB7802RugS4hj7lCtEn9v1WneT57L09lKXBFJccEg-Lz2IeCvXVK6_8gJw/exec";
+
+        // Beim Start: Heutige Planung laden
+        window.onload = function() {
+            document.getElementById('datum').valueAsDate = new Date();
+            ladePlanung();
+        };
+
+        function ladePlanung() {
+            const datum = document.getElementById('datum').value;
+            // Ruft Funktion im Apps Script auf
+            google.script.run.withSuccessHandler(function(planung) {
+                if(planung) {
+                    document.getElementById('typ').value = planung.typ || "";
+                    document.getElementById('textwort').value = planung.textwort || "";
+                    document.getElementById('leiter').value = planung.leiter || "";
+                    document.getElementById('lied1').value = planung.lied1 || "";
+                    document.getElementById('lied2').value = planung.lied2 || "";
+                    document.getElementById('lied3').value = planung.lied3 || "";
+                    document.getElementById('notizen').value = planung.notizen || "";
+                }
+            }).getPlanungsDaten(datum);
+        }
 
         function showPage(n) {
             document.querySelectorAll('.page').forEach((p, i) => p.style.display = (i+1 === n) ? 'block' : 'none');
@@ -120,8 +131,6 @@
             el.innerText = Math.max(0, parseInt(el.innerText) + delta);
             calculateTotals();
         }
-
-        function quickAdd(selId) { updateCount(document.getElementById(selId).value, 1); }
 
         function calculateTotals() {
             const getV = (id) => parseInt(document.getElementById(id).innerText) || 0;
@@ -143,21 +152,6 @@
             btn.classList.toggle('locked-mode', !isLocked);
         }
 
-        function resetForm() {
-            // Textfelder leeren
-            const inputs = ['datum', 'beginn', 'ende', 'textwort', 'leiter', 'mit1', 'mit2', 'lied1', 'lied2', 'lied3', 'notizen'];
-            inputs.forEach(id => document.getElementById(id).value = "");
-            // Zähler auf 0
-            const counters = ['saalGesamt', 'saalBesucher', 'saalKinder', 'saalGaeste', 'empGesamt', 'empBesucher', 'empKinder', 'empGaeste'];
-            counters.forEach(id => document.getElementById(id).innerText = "0");
-            // Live-Summen auf 0
-            calculateTotals();
-            // Sperre aufheben (für neuen GD)
-            const btn = document.getElementById('globalLockBtn');
-            if(btn.innerText.includes("🔒")) toggleGlobalLockPage1();
-            showPage(1);
-        }
-
         async function saveAndPDF() {
             const btn = document.querySelector('button[onclick="saveAndPDF()"]');
             btn.innerText = "⏳ ÜBERTRAGE..."; btn.disabled = true;
@@ -175,16 +169,9 @@
 
             try {
                 await fetch(googleUrl, { method: 'POST', mode: 'no-cors', body: JSON.stringify(data) });
-                const { jsPDF } = window.jspdf;
-                const doc = new jsPDF();
-                doc.text("Gottesdienst Protokoll", 20, 20);
-                doc.text(`Datum: ${data.datum} (${data.typ})`, 20, 30);
-                doc.text(`Gesamt: ${data.liveGesamt} (B: ${data.liveBesucher}, K: ${data.liveKinder}, G: ${data.liveGaeste})`, 20, 40);
-                doc.save(`GD_${data.datum}.pdf`);
-                alert("Gespeichert! Formular wird zurückgesetzt.");
-                resetForm();
-            } catch (e) { alert("Fehler!"); }
-            btn.innerText = "💾 SPEICHERN & RESET"; btn.disabled = false;
+                alert("Erfolgreich gespeichert!");
+                location.reload(); // Einfachster Reset: Seite neu laden
+            } catch (e) { alert("Fehler!"); btn.disabled = false; }
         }
     </script>
 </body>
