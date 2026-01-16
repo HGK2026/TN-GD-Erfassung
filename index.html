@@ -106,20 +106,33 @@
         };
 
         function ladePlanung() {
-            const datum = document.getElementById('datum').value;
-            // Ruft Funktion im Apps Script auf
-            google.script.run.withSuccessHandler(function(planung) {
-                if(planung) {
-                    document.getElementById('typ').value = planung.typ || "";
-                    document.getElementById('textwort').value = planung.textwort || "";
-                    document.getElementById('leiter').value = planung.leiter || "";
-                    document.getElementById('lied1').value = planung.lied1 || "";
-                    document.getElementById('lied2').value = planung.lied2 || "";
-                    document.getElementById('lied3').value = planung.lied3 || "";
-                    document.getElementById('notizen').value = planung.notizen || "";
-                }
-            }).getPlanungsDaten(datum);
-        }
+    const datum = document.getElementById('datum').value;
+    console.log("Suche Planung für: " + datum);
+
+    google.script.run
+        .withSuccessHandler(function(planung) {
+            if (planung && !planung.error) {
+                console.log("Daten gefunden:", planung);
+                document.getElementById('typ').value = planung.typ;
+                document.getElementById('textwort').value = planung.textwort;
+                document.getElementById('leiter').value = planung.leiter;
+                document.getElementById('lied1').value = planung.lied1;
+                document.getElementById('lied2').value = planung.lied2;
+                document.getElementById('lied3').value = planung.lied3;
+                document.getElementById('notizen').value = planung.notizen;
+            } else {
+                console.log(planung ? planung.error : "Keine Antwort vom Server");
+                // Felder leeren, wenn nichts gefunden wurde
+                ['typ', 'textwort', 'leiter', 'lied1', 'lied2', 'lied3', 'notizen'].forEach(id => {
+                    document.getElementById(id).value = "";
+                });
+            }
+        })
+        .withFailureHandler(function(err) {
+            console.error("Script-Fehler:", err);
+        })
+        .getPlanungsDaten(datum);
+}
 
         function showPage(n) {
             document.querySelectorAll('.page').forEach((p, i) => p.style.display = (i+1 === n) ? 'block' : 'none');
