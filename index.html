@@ -3,31 +3,43 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GD-Erfassung V4.0 (Google Sync)</title>
+    <title>GD-Erfassung V4.7</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <style>
         :root { --primary: #1a3a5a; --accent: #27ae60; --danger: #e74c3c; --saal-bg: #e3f2fd; --emp-bg: #fdf5e6; }
         body { font-family: 'Segoe UI', sans-serif; max-width: 800px; margin: auto; padding: 5px; background: #f0f2f5; }
+        
         .nav-header { display: flex; width: 100%; gap: 2px; margin-bottom: 5px; }
         .nav-tab { flex: 1; padding: 15px 2px; border: none; background: #ccc; cursor: pointer; font-weight: bold; border-radius: 8px 8px 0 0; font-size: 0.85em; }
         .nav-tab.active { background: var(--primary); color: white; }
+        
         .page { background: white; padding: 15px; border-radius: 0 8px 8px 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); display: none; min-height: 80vh; }
-        #globalLockBtn { width: 100%; padding: 12px; margin-bottom: 15px; border-radius: 8px; border: 2px solid var(--primary); background: white; font-weight: bold; cursor: pointer; }
-        #globalLockBtn.locked-mode { background: var(--danger); color: white; }
-        .row { display: flex; gap: 8px; margin-bottom: 10px; width: 100%; }
-        .field-container { display: flex; flex-direction: column; flex: 1; padding: 4px; border: 2px solid transparent; border-radius: 8px; }
-        .field-container.is-locked { border-color: var(--danger); background: #fff5f5; }
-        label { font-size: 0.7em; font-weight: bold; color: #555; }
+        
+        #globalLockBtn { width: 100%; padding: 12px; margin-bottom: 15px; border-radius: 8px; border: 2px solid var(--primary); background: white; font-weight: bold; }
+        #globalLockBtn.locked-mode { background: var(--danger); color: white; border-color: var(--danger); }
+
+        .row { display: flex; gap: 8px; margin-bottom: 10px; }
+        .field-container { display: flex; flex-direction: column; flex: 1; padding: 4px; border: 2px solid transparent; }
+        .field-container.is-locked { border-color: var(--danger); background: #fff5f5; border-radius: 8px; }
+
+        label { font-size: 0.75em; font-weight: bold; color: #555; margin-bottom: 2px; }
         input, select, textarea { padding: 10px 6px; border: 1px solid #ccc; border-radius: 6px; font-size: 15px; width: 100%; box-sizing: border-box; }
+        
         .counter-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px; }
         .counter-card { padding: 10px; border-radius: 12px; text-align: center; border: 2px solid #ddd; background: white; position: relative; }
-        .counter-card.locked { border-color: var(--danger); background: #fff0f0; }
-        .lock-icon { cursor: pointer; position: absolute; top: 5px; left: 5px; }
         .btn-count { width: 55px; height: 45px; font-size: 22px; border: none; border-radius: 10px; color: white; cursor: pointer; }
         .plus { background: var(--accent); } .minus { background: var(--danger); }
         .count-value { font-size: 28px; font-weight: bold; display: block; }
-        .totals-bar { background: #fff; padding: 12px; border-radius: 10px; border: 2px solid var(--primary); }
-        .total-row { display: grid; grid-template-columns: 100px 10px 1fr; gap: 5px; font-weight: bold; color: var(--primary); }
+
+        /* Große XXL Plus-Buttons */
+        .quick-add-area { border-top: 1px dashed #999; padding-top: 15px; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+        .btn-quick-xxl { width: 100px; height: 100px; color: white; border: none; border-radius: 50%; font-size: 50px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
+        #p2 .btn-quick-xxl { background: #1976d2; }
+        #p3 .btn-quick-xxl { background: #8d6e63; }
+
+        .totals-bar { background: #fff; padding: 12px; border-radius: 10px; border: 2px solid var(--primary); display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .total-item { font-weight: bold; color: var(--primary); font-size: 0.9em; border-bottom: 1px solid #eee; padding: 4px 0; }
+        .total-val { float: right; color: #000; }
     </style>
 </head>
 <body>
@@ -41,52 +53,64 @@
 
     <div class="page" id="p1" style="display:block;">
         <button id="globalLockBtn" onclick="toggleGlobalLockPage1()">🔓 SEITE 1 BEARBEITEN</button>
+        
         <div class="row">
             <div class="field-container"><label>Datum</label><input type="date" id="datum"></div>
             <div class="field-container"><label>Beginn</label><input type="time" id="beginn"></div>
             <div class="field-container"><label>Ende</label><input type="time" id="ende"></div>
         </div>
+        
         <div class="row">
             <div class="field-container"><label>Typ</label>
-                <select id="typ">
-                    <option>Sonntagsgottesdienst</option><option>Wochengottesdienst</option><option>Festgottesdienst</option>
-                </select>
+                <select id="typ"><option>Sonntag</option><option>Woche</option><option>Fest</option></select>
             </div>
             <div class="field-container"><label>Textwort</label><input type="text" id="textwort"></div>
         </div>
+
         <div class="row">
             <div class="field-container"><label>Leiter</label><input type="text" id="leiter"></div>
             <div class="field-container"><label>Mitd. 1</label><input type="text" id="mit1"></div>
             <div class="field-container"><label>Mitd. 2</label><input type="text" id="mit2"></div>
         </div>
-        <div class="row">
-            <div class="field-container"><label>Eingang</label><input type="text" id="lied1"></div>
-            <div class="field-container"><label>Bußlied</label><input type="text" id="lied2"></div>
-            <div class="field-container"><label>Abendmahl</label><input type="text" id="lied3"></div>
+
+        <h4 style="margin: 10px 0 5px 5px;">Live-Übersicht Ergebnisse</h4>
+        <div class="totals-bar">
+            <div class="total-item">Gesamt: <span id="totalGesamt" class="total-val">0</span></div>
+            <div class="total-item">Kinder: <span id="totalKinder" class="total-val">0</span></div>
+            <div class="total-item">S. Bes.: <span id="totalSaalBes" class="total-val">0</span></div>
+            <div class="total-item">S. Gäst.: <span id="totalSaalGast" class="total-val">0</span></div>
+            <div class="total-item">E. Bes.: <span id="totalEmpBes" class="total-val">0</span></div>
+            <div class="total-item">E. Gäst.: <span id="totalEmpGast" class="total-val">0</span></div>
         </div>
 
-        <div class="totals-bar">
-            <div class="total-row"><span>Gesamt</span><span>:</span><span id="totalGesamt">0</span></div>
-            <div class="total-row"><span>Kinder</span><span>:</span><span id="totalKinder">0</span></div>
-        </div>
-        <button onclick="saveAndPDF()" style="width:100%; padding:18px; background:var(--primary); color:white; border:none; border-radius:10px; font-weight:bold; margin-top:15px; cursor:pointer;">💾 SPEICHERN & PDF ERZEUGEN</button>
+        <button onclick="saveAndPDF()" style="width:100%; padding:18px; background:var(--primary); color:white; border:none; border-radius:10px; font-weight:bold; margin-top:15px; cursor:pointer;">💾 SPEICHERN & PDF</button>
     </div>
 
     <div class="page" id="p2" style="background-color: var(--saal-bg);">
         <div class="counter-grid">
-            <div class="counter-card" id="card-saalGesamt"><span class="lock-icon" onclick="toggleCounterLock('saalGesamt')">🔓</span><label>SAAL GESAMT</label><span id="saalGesamt" class="count-value">0</span><div class="counter-controls"><button class="btn-count minus" onclick="updateCount('saalGesamt', -1)">-</button><button class="btn-count plus" onclick="updateCount('saalGesamt', 1)">+</button></div></div>
-            <div class="counter-card" id="card-saalKinder"><span class="lock-icon" onclick="toggleCounterLock('saalKinder')">🔓</span><label>KINDER</label><span id="saalKinder" class="count-value">0</span><div class="counter-controls"><button class="btn-count minus" onclick="updateCount('saalKinder', -1)">-</button><button class="btn-count plus" onclick="updateCount('saalKinder', 1)">+</button></div></div>
-            <div class="counter-card" id="card-saalBesucher"><span class="lock-icon" onclick="toggleCounterLock('saalBesucher')">🔓</span><label>BESUCHER</label><span id="saalBesucher" class="count-value">0</span><div class="counter-controls"><button class="btn-count minus" onclick="updateCount('saalBesucher', -1)">-</button><button class="btn-count plus" onclick="updateCount('saalBesucher', 1)">+</button></div></div>
-            <div class="counter-card" id="card-saalGaeste"><span class="lock-icon" onclick="toggleCounterLock('saalGaeste')">🔓</span><label>GÄSTE</label><span id="saalGaeste" class="count-value">0</span><div class="counter-controls"><button class="btn-count minus" onclick="updateCount('saalGaeste', -1)">-</button><button class="btn-count plus" onclick="updateCount('saalGaeste', 1)">+</button></div></div>
+            <div class="counter-card"><label>BESUCHER</label><span id="saalBesucher" class="count-value">0</span><div class="counter-controls"><button class="btn-count minus" onclick="updateCount('saalBesucher', -1)">-</button><button class="btn-count plus" onclick="updateCount('saalBesucher', 1)">+</button></div></div>
+            <div class="counter-card"><label>GÄSTE</label><span id="saalGaeste" class="count-value">0</span><div class="counter-controls"><button class="btn-count minus" onclick="updateCount('saalGaeste', -1)">-</button><button class="btn-count plus" onclick="updateCount('saalGaeste', 1)">+</button></div></div>
+            <div class="counter-card"><label>KINDER</label><span id="saalKinder" class="count-value">0</span><div class="counter-controls"><button class="btn-count minus" onclick="updateCount('saalKinder', -1)">-</button><button class="btn-count plus" onclick="updateCount('saalKinder', 1)">+</button></div></div>
+            <div class="counter-card"><label>URLAUBER</label><span id="saalUrlauber" class="count-value">0</span><div class="counter-controls"><button class="btn-count minus" onclick="updateCount('saalUrlauber', -1)">-</button><button class="btn-count plus" onclick="updateCount('saalUrlauber', 1)">+</button></div></div>
+        </div>
+        <div class="quick-add-area">
+            <label>SCHNELL-ZÄHLER (SAAL)</label>
+            <select id="saalQuickSel"><option value="saalBesucher">Besucher</option><option value="saalGaeste">Gäste</option><option value="saalKinder">Kinder</option></select>
+            <button class="btn-quick-xxl" onclick="quickAdd('saalQuickSel')">＋</button>
         </div>
     </div>
 
     <div class="page" id="p3" style="background-color: var(--emp-bg);">
         <div class="counter-grid">
-            <div class="counter-card" id="card-empGesamt"><span class="lock-icon" onclick="toggleCounterLock('empGesamt')">🔓</span><label>EMPORE GESAMT</label><span id="empGesamt" class="count-value">0</span><div class="counter-controls"><button class="btn-count minus" onclick="updateCount('empGesamt', -1)">-</button><button class="btn-count plus" onclick="updateCount('empGesamt', 1)">+</button></div></div>
-            <div class="counter-card" id="card-empKinder"><span class="lock-icon" onclick="toggleCounterLock('empKinder')">🔓</span><label>KINDER</label><span id="empKinder" class="count-value">0</span><div class="counter-controls"><button class="btn-count minus" onclick="updateCount('empKinder', -1)">-</button><button class="btn-count plus" onclick="updateCount('empKinder', 1)">+</button></div></div>
-            <div class="counter-card" id="card-empBesucher"><span class="lock-icon" onclick="toggleCounterLock('empBesucher')">🔓</span><label>BESUCHER</label><span id="empBesucher" class="count-value">0</span><div class="counter-controls"><button class="btn-count minus" onclick="updateCount('empBesucher', -1)">-</button><button class="btn-count plus" onclick="updateCount('empBesucher', 1)">+</button></div></div>
-            <div class="counter-card" id="card-empGaeste"><span class="lock-icon" onclick="toggleCounterLock('empGaeste')">🔓</span><label>GÄSTE</label><span id="empGaeste" class="count-value">0</span><div class="counter-controls"><button class="btn-count minus" onclick="updateCount('empGaeste', -1)">-</button><button class="btn-count plus" onclick="updateCount('empGaeste', 1)">+</button></div></div>
+            <div class="counter-card"><label>BESUCHER</label><span id="empBesucher" class="count-value">0</span><div class="counter-controls"><button class="btn-count minus" onclick="updateCount('empBesucher', -1)">-</button><button class="btn-count plus" onclick="updateCount('empBesucher', 1)">+</button></div></div>
+            <div class="counter-card"><label>GÄSTE</label><span id="empGaeste" class="count-value">0</span><div class="counter-controls"><button class="btn-count minus" onclick="updateCount('empGaeste', -1)">-</button><button class="btn-count plus" onclick="updateCount('empGaeste', 1)">+</button></div></div>
+            <div class="counter-card"><label>KINDER</label><span id="empKinder" class="count-value">0</span><div class="counter-controls"><button class="btn-count minus" onclick="updateCount('empKinder', -1)">-</button><button class="btn-count plus" onclick="updateCount('empKinder', 1)">+</button></div></div>
+            <div class="counter-card"><label>URLAUBER</label><span id="empUrlauber" class="count-value">0</span><div class="counter-controls"><button class="btn-count minus" onclick="updateCount('empUrlauber', -1)">-</button><button class="btn-count plus" onclick="updateCount('empUrlauber', 1)">+</button></div></div>
+        </div>
+        <div class="quick-add-area">
+            <label>SCHNELL-ZÄHLER (EMPORE)</label>
+            <select id="empQuickSel"><option value="empBesucher">Besucher</option><option value="empGaeste">Gäste</option><option value="empKinder">Kinder</option></select>
+            <button class="btn-quick-xxl" onclick="quickAdd('empQuickSel')">＋</button>
         </div>
     </div>
 
@@ -101,22 +125,41 @@
         }
 
         function updateCount(id, delta) {
-            if (document.getElementById('card-' + id).classList.contains('locked')) return;
             let el = document.getElementById(id);
             el.innerText = Math.max(0, parseInt(el.innerText) + delta);
             calculateTotals();
         }
 
+        function quickAdd(selId) {
+            const target = document.getElementById(selId).value;
+            updateCount(target, 1);
+        }
+
         function calculateTotals() {
-            const getVal = (id) => parseInt(document.getElementById(id).innerText) || 0;
-            document.getElementById('totalGesamt').innerText = getVal('saalGesamt') + getVal('empGesamt');
-            document.getElementById('totalKinder').innerText = getVal('saalKinder') + getVal('empKinder');
+            const getV = (id) => parseInt(document.getElementById(id).innerText) || 0;
+            
+            const sBes = getV('saalBesucher');
+            const sGast = getV('saalGaeste');
+            const sKind = getV('saalKinder');
+            const sUrl = getV('saalUrlauber');
+            
+            const eBes = getV('empBesucher');
+            const eGast = getV('empGaeste');
+            const eKind = getV('empKinder');
+            const eUrl = getV('empUrlauber');
+
+            document.getElementById('totalSaalBes').innerText = sBes;
+            document.getElementById('totalSaalGast').innerText = sGast;
+            document.getElementById('totalEmpBes').innerText = eBes;
+            document.getElementById('totalEmpGast').innerText = eGast;
+            document.getElementById('totalKinder').innerText = sKind + eKind;
+            document.getElementById('totalGesamt').innerText = sBes + sGast + sKind + sUrl + eBes + eGast + eKind + eUrl;
         }
 
         function toggleGlobalLockPage1() {
             const btn = document.getElementById('globalLockBtn');
             const isLocked = btn.innerText.includes("🔒");
-            const fields = ['datum', 'typ', 'beginn', 'ende', 'textwort', 'lied1', 'lied2', 'lied3', 'leiter', 'mit1', 'mit2'];
+            const fields = ['datum', 'typ', 'beginn', 'ende', 'textwort', 'leiter', 'mit1', 'mit2'];
             fields.forEach(id => {
                 document.getElementById(id).disabled = !isLocked;
                 document.getElementById(id).closest('.field-container').classList.toggle('is-locked', !isLocked);
@@ -125,35 +168,27 @@
             btn.classList.toggle('locked-mode', !isLocked);
         }
 
-        function toggleCounterLock(id) {
-            const card = document.getElementById('card-' + id);
-            card.querySelector('.lock-icon').innerText = card.classList.toggle('locked') ? "🔒" : "🔓";
-        }
-
         async function saveAndPDF() {
-            const getV = (id) => document.getElementById(id).value || document.getElementById(id).innerText;
+            const getVal = (id) => document.getElementById(id).value || document.getElementById(id).innerText;
             const data = {
-                datum: getV('datum'), beginn: getV('beginn'), ende: getV('ende'), typ: getV('typ'),
-                textwort: getV('textwort'), leiter: getV('leiter'), mit1: getV('mit1'), mit2: getV('mit2'),
-                lied1: getV('lied1'), lied2: getV('lied2'), lied3: getV('lied3'),
-                saalGesamt: getV('saalGesamt'), saalKinder: getV('saalKinder'), saalBesucher: getV('saalBesucher'), saalGaeste: getV('saalGaeste'),
-                empGesamt: getV('empGesamt'), empKinder: getV('empKinder'), empBesucher: getV('empBesucher'), empGaeste: getV('empGaeste'),
-                notizen: getV('notizen')
+                datum: getVal('datum'), beginn: getVal('beginn'), ende: getVal('ende'), typ: getVal('typ'),
+                textwort: getVal('textwort'), leiter: getVal('leiter'), mit1: getVal('mit1'), mit2: getVal('mit2'),
+                saalBesucher: getVal('saalBesucher'), saalGaeste: getVal('saalGaeste'), saalKinder: getVal('saalKinder'), saalUrlauber: getVal('saalUrlauber'),
+                empBesucher: getVal('empBesucher'), empGaeste: getVal('empGaeste'), empKinder: getVal('empKinder'), empUrlauber: getVal('empUrlauber'),
+                notizen: getVal('notizen')
             };
 
-            // 1. Senden an Google Tabelle
             try {
                 await fetch(googleUrl, { method: 'POST', mode: 'no-cors', body: JSON.stringify(data) });
-                alert("Daten in Google Tabelle gespeichert!");
-            } catch (e) { alert("Fehler beim Speichern in Tabelle!"); }
-
-            // 2. PDF Erzeugen
-            const { jsPDF } = window.jspdf;
-            const doc = new jsPDF();
-            doc.text("Gottesdienst Protokoll", 20, 20);
-            doc.text(`Datum: ${data.datum} (${data.typ})`, 20, 30);
-            doc.text(`Gesamtteilnehmer: ${getV('totalGesamt')}`, 20, 40);
-            doc.save(`Protokoll_${data.datum}.pdf`);
+                alert("Daten erfolgreich übertragen!");
+                
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF();
+                doc.text("Gottesdienst Protokoll", 20, 20);
+                doc.text("Datum: " + data.datum, 20, 30);
+                doc.text("Gesamt: " + document.getElementById('totalGesamt').innerText, 20, 40);
+                doc.save("GD_Protokoll.pdf");
+            } catch (e) { alert("Fehler!"); }
         }
     </script>
 </body>
